@@ -24,7 +24,7 @@ function getDatabase_() {
     props.setProperty('DATABASE_ID', id);
     const sheet = file.getSheets()[0];
     sheet.setName('Recuperação');
-    sheet.appendRow(['Data', 'Usuário', 'Aluno', 'Turma', 'Disciplina', 'Nota primeiro bimestre', 'Nota segundo bimestre', 'Nota recuperação semestral', 'Bimestre substituído', 'Status']);
+    sheet.appendRow(['Data', 'Usuário', 'Escola', 'Aluno', 'Turma', 'Disciplina', 'Nota primeiro bimestre', 'Nota segundo bimestre', 'Nota recuperação semestral', 'Bimestre substituído', 'Status']);
   }
   return SpreadsheetApp.openById(id);
 }
@@ -73,29 +73,36 @@ function validateRecoveryRecord_(row) {
   return values.map(sanitizeCell_);
 }
 
-function saveRecoveryBatch(records) {
+function saveRecoveryBatch(records, schoolName) {
   const user = requireAuthorizedUser_();
   if (!Array.isArray(records)) throw new Error('Lote inválido.');
   if (records.length > MAX_BATCH_RECORDS) throw new Error(`Lote excede o limite de ${MAX_BATCH_RECORDS} registros.`);
+  schoolName = String(schoolName || '').trim();
+  if (!schoolName || schoolName.length > MAX_FIELD_LENGTH) throw new Error('Nome da escola é obrigatório e deve ter até 160 caracteres.');
   const lock = LockService.getScriptLock();
   lock.waitLock(MAX_LOCK_WAIT_MS);
   try {
     const book = getDatabase_();
     const sheet = book.getSheetByName('Recuperação');
+    const header = sheet.getRange(1, 1, 1, Math.max(11, sheet.getMaxColumns())).getValues()[0];
+    if (header[2] !== 'Escola') {
+      sheet.insertColumnBefore(3);
+      sheet.getRange(1, 3).setValue('Escola');
+    }
     const now = new Date();
-    const values = records.map(row => [now, user, ...validateRecoveryRecord_(row)]);
+    const values = records.map(row => [now, user, sanitizeCell_(schoolName), ...validateRecoveryRecord_(row)]);
     if (!values.length) return { saved: 0, updated: 0, inserted: 0 };
 
     // Autosalvamento deve atualizar o registro existente, nunca duplicá-lo.
     const lastRow = sheet.getLastRow();
-    const existing = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 10).getValues() : [];
+    const existing = lastRow > 1 ? sheet.getRange(2, 1, lastRow - 1, 11).getValues() : [];
     const rowByKey = new Map();
-    existing.forEach((row, index) => rowByKey.set(canonicalKey_([row[2], row[3], row[4]]), index + 2));
+    existing.forEach((row, index) => rowByKey.set(canonicalKey_([row[2], row[3], row[4], row[5]]), index + 2));
 
     const updates = [];
     const inserts = [];
     values.forEach(value => {
-      const key = canonicalKey_([value[2], value[3], value[4]]);
+      const key = canonicalKey_([value[2], value[3], value[4], value[5]]);
       const targetRow = rowByKey.get(key);
       if (targetRow) updates.push({ row: targetRow, value });
       else {
@@ -104,7 +111,7 @@ function saveRecoveryBatch(records) {
       }
     });
 
-    updates.forEach(item => sheet.getRange(item.row, 1, 1, 10).setValues([item.value]));
+    updates.forEach(item => sheet.getRange(item.row, 1, 1, 11).setValues([item.value]));
     if (inserts.length) sheet.getRange(lastRow + 1, 1, inserts.length, 10).setValues(inserts);
     return { saved: values.length, updated: updates.length, inserted: inserts.length };
   } finally {
