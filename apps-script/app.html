@@ -23,7 +23,7 @@ function renderAta(className){const rows=recoveryData.filter(r=>r[1]===className
 function renderMinutes(){const groups=[...new Set(recoveryData.map(r=>r[1]))].filter(Boolean);$('#minutes-list').innerHTML=groups.map((name,i)=>{const count=recoveryData.filter(r=>r[1]===name).length;return `<div class="minute-row ${i===0?'selected':''}"><strong>${escapeHtml(name)}</strong><small>${count} registros • Rascunho para revisão</small><button data-ata-class="${escapeHtml(name)}">Revisar ATA →</button></div>`}).join('');$$('[data-ata-class]').forEach(b=>b.onclick=()=>renderAta(b.dataset.ataClass));if(groups[0])renderAta(groups[0]);}
 function switchView(view){$$('.view').forEach(v=>v.classList.remove('active'));$(`#${view}-view`).classList.add('active');$$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===view));const titles={overview:'Visão geral',recovery:'Recuperação',classes:'Turmas',minutes:'Atas'};$('#page-title').textContent=titles[view];window.scrollTo({top:0,behavior:'smooth'});}
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2600)}
-function normal(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toUpperCase()}
+function normal(v){return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim().toUpperCase()}
 function cleanSubject(v){return String(v??'').replace(/\s*\([12]B\)\s*$/i,'').replace(/\s+\d{3,6}\s*$/,'').trim()}
 function cleanClassName(v){return String(v??'').replace(/\.(xlsx|xls)$/i,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim()}
 function subjectPeriod(v,fallback){const match=normal(v).match(/\(([12])B\)/);return match?`${match[1]}º`:fallback}
