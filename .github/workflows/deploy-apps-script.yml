@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Baixar código
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Configurar Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: 20
 
@@ -39,8 +39,10 @@ jobs:
         working-directory: apps-script
         env:
           GITHUB_SHA: ${{ github.sha }}
+          WEB_APP_DEPLOYMENT_ID: ${{ vars.APPSSCRIPT_WEB_APP_DEPLOYMENT_ID }}
         run: |
-          npx --yes @google/clasp push --force
-          VERSION=$(npx --yes @google/clasp version "GitHub ${GITHUB_SHA:0:7}" | sed -nE 's/.*version ([0-9]+).*/\1/p' | tail -1)
+          test -n "$WEB_APP_DEPLOYMENT_ID"
+          npx --yes @google/clasp@3.3.0 push --force
+          VERSION=$(npx --yes @google/clasp@3.3.0 version "GitHub ${GITHUB_SHA:0:7}" | sed -nE 's/.*version ([0-9]+).*/\1/p' | tail -1)
           test -n "$VERSION"
-          npx --yes @google/clasp deploy --versionNumber "$VERSION" --description "GitHub ${GITHUB_SHA:0:7}"
+          npx --yes @google/clasp@3.3.0 deploy --deploymentId "$WEB_APP_DEPLOYMENT_ID" --versionNumber "$VERSION" --description "GitHub ${GITHUB_SHA:0:7}"
