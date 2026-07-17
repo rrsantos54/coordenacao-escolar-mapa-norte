@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#10221d" />
+    <title>Mapa Norte — Coordenação escolar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <?!= include('styles'); ?>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand"><span class="brand-mark">M</span><span>Mapa Norte</span></div>
+        <p class="eyebrow side-label">Coordenação</p>
+        <nav aria-label="Navegação principal">
+          <button class="nav-item active" data-view="overview"><span class="nav-icon">⌂</span> Visão geral</button>
+          <button class="nav-item" data-view="recovery"><span class="nav-icon">↗</span> Recuperação <span class="nav-badge">12</span></button>
+          <button class="nav-item" data-view="classes"><span class="nav-icon">▦</span> Turmas</button>
+          <button class="nav-item" data-view="minutes"><span class="nav-icon">▤</span> Atas</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <div class="school-card"><span class="school-dot"></span><div><strong>Waldomiro Sampaio</strong><small>Ano letivo 2026</small></div></div>
+          <button class="profile"><span class="avatar">RS</span><span>Rogério Santos</span><span class="chevron">⌄</span></button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div><p class="eyebrow">Quarta-feira, 16 julho 2026</p><h1 id="page-title">Visão geral</h1></div>
+          <div class="top-actions"><button class="icon-button" aria-label="Notificações">♧<span class="notification-dot"></span></button><button class="user-button"><span class="avatar small">RS</span> Rogério <span>⌄</span></button></div>
+        </header>
+
+        <section class="view active" id="overview-view">
+          <div class="welcome-row"><div><h2>Bom trabalho, Rogério.</h2><p>Seu lote está quase pronto para conferência.</p></div><button class="primary-button" id="open-upload"><span>＋</span> Importar lote</button></div>
+
+          <div class="metric-grid">
+            <article class="metric-card featured"><div class="metric-label">Alunos em recuperação <span class="status-pill">● aguardando</span></div><strong class="metric-value">00</strong><p>Importe um lote para começar</p><div class="sparkline"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="metric-card"><div class="metric-label">Turmas processadas</div><strong class="metric-value">00 <small>/ 00</small></strong><p>Nenhum lote carregado</p><div class="progress"><span style="width:0%"></span></div></article>
+            <article class="metric-card"><div class="metric-label">Pendências de conferência</div><strong class="metric-value">00</strong><p><span class="warning">●</span> nada para revisar</p><div class="mini-lines"><span></span><span></span><span></span></div></article>
+          </div>
+
+          <div class="section-heading"><div><p class="eyebrow">Fluxo do lote</p><h3>O que precisa acontecer agora</h3></div><button class="text-button" data-view="recovery">Ver tudo <span>→</span></button></div>
+          <div class="work-grid">
+            <article class="work-card import-card"><div class="card-top"><span class="step-number">01</span><span class="muted-tag">Aguardando</span></div><h4>Importar arquivos</h4><p>Selecione planilhas do 1º e 2º bimestre</p><div class="file-row"><span class="file-icon">X</span><div><strong>Nenhum lote carregado</strong><small>Arquivos originais preservados</small></div></div></article>
+            <article class="work-card focus-card"><div class="card-top"><span class="step-number">02</span><span class="muted-tag">Aguardando</span></div><h4>Conferir recuperação</h4><p>Lista aparece após processamento</p><button class="card-link" data-view="recovery">Abrir lista <span>→</span></button></article>
+            <article class="work-card"><div class="card-top"><span class="step-number">03</span><span class="muted-tag">Aguardando</span></div><h4>Finalizar atas</h4><p>Disponível após lançamento das notas</p><div class="locked-line"><span>▤</span> Nenhuma ATA gerada</div></article>
+          </div>
+
+          <div class="section-heading recent-heading"><div><p class="eyebrow">Acompanhamento</p><h3>Turmas no lote</h3></div><button class="filter-button">Todos os status <span>⌄</span></button></div>
+          <div class="table-wrap"><table><thead><tr><th>Turma</th><th>Bimestres</th><th>Alunos</th><th>Recuperação</th><th>Status</th><th></th></tr></thead><tbody id="classes-table"></tbody></table></div>
+        </section>
+
+        <section class="view" id="recovery-view"><div class="page-intro"><div><p class="eyebrow">Ação necessária</p><h2>Lista de recuperação</h2><p>Uma Avaliação de Recuperação Semestral por componente curricular.</p></div><button class="primary-button" id="export-recovery">↓ Exportar Excel</button></div><div class="toolbar"><div class="search-box">⌕<input id="search" placeholder="Buscar aluno ou disciplina" /></div><select id="class-filter"><option value="all">Todas as turmas</option></select><select id="subject-filter"><option value="all">Todas as matérias</option></select><span class="toolbar-count">0 registros</span></div><div class="table-wrap recovery-table"><table><thead><tr><th>Aluno</th><th>Turma</th><th>Disciplina</th><th>1º bim.</th><th>2º bim.</th><th>Nota recuperação</th><th>Bimestre substituído</th><th>Status</th></tr></thead><tbody id="recovery-table"></tbody></table></div></section>
+
+        <section class="view" id="classes-view"><div class="page-intro"><div><p class="eyebrow">Lote atual</p><h2>Turmas processadas</h2><p>Visão consolidada dos arquivos recebidos.</p></div><button class="primary-button" id="open-upload-2">＋ Importar lote</button></div><div class="class-grid" id="class-cards"></div></section>
+
+        <section class="view" id="minutes-view"><div class="page-intro"><div><p class="eyebrow">Documentos finais</p><h2>Atas de recuperação</h2><p>Gere, revise e exporte uma ATA por turma.</p></div><button class="primary-button" id="generate-minutes">Gerar atas disponíveis</button></div><div class="minutes-layout"><div class="minutes-list" id="minutes-list"></div><article class="ata-preview"><div class="preview-toolbar"><div class="preview-label">PRÉVIA DO DOCUMENTO</div><button class="filter-button" id="print-ata">Imprimir / PDF</button></div><div class="paper"><p class="paper-center">GOVERNO DO ESTADO DE SÃO PAULO<br /><strong>SECRETARIA DE ESTADO DA EDUCAÇÃO</strong></p><h4>ATA DE RECUPERAÇÃO SEMESTRAL — 2026</h4><p>Aos ____ dias do mês de agosto de dois mil e vinte e seis, nesta unidade escolar, realizou-se a Avaliação de Recuperação Semestral dos alunos da turma <strong>não identificada</strong>.</p><div class="paper-table"><span>Aluno</span><span>Disciplina</span><span>Nota do primeiro bimestre</span><span>Nota do segundo bimestre</span><span>Nota da recuperação semestral</span><span>Bimestre substituído</span><span>Maria Clara da Silva</span><span>Matemática</span><span>____</span><span>____</span><span>____</span><span>____</span></div><div class="signatures"><span>____________________<small>Coordenação</small></span><span>____________________<small>Direção</small></span></div></div></article></div></section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="upload-modal" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" id="close-upload" aria-label="Fechar">×</button><p class="eyebrow">Novo processamento</p><h2 id="modal-title">Importar lote</h2><p>Selecione uma pasta com planilhas do 1º e 2º bimestre. App identifica turmas automaticamente.</p><label class="dropzone" for="folder-input"><span class="upload-symbol">↥</span><strong>Arraste arquivos aqui</strong><small>ou clique para selecionar arquivos .xlsx</small><input id="folder-input" type="file" accept=".xlsx,.xls" multiple /></label><div class="modal-note"><span>i</span> Arquivos originais permanecem intactos.</div></div></div>
+    <div class="toast" id="toast" role="status"></div>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <?!= include('app'); ?>
+  </body>
+</html>
