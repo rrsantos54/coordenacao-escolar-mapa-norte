@@ -26,13 +26,35 @@ function getDatabase_() {
   return SpreadsheetApp.openById(id);
 }
 
+function sanitizeCell_(value) {
+  if (typeof value !== 'string') return value;
+  return /^[=+\-@]/.test(value.trimStart()) ? `'${value}` : value;
+}
+
+function validateRecoveryRecord_(row) {
+  if (!Array.isArray(row) || row.length < 8) throw new Error('Registro de recuperação inválido.');
+  const values = row.slice(0, 8);
+  [0, 1, 2].forEach(index => {
+    if (!String(values[index] || '').trim()) throw new Error('Aluno, turma e disciplina são obrigatórios.');
+  });
+  [3, 4, 5].forEach(index => {
+    const raw = values[index];
+    if (raw === '' || raw === '—' || raw === null || raw === undefined) return;
+    const grade = Number(String(raw).replace(',', '.'));
+    if (!Number.isFinite(grade) || grade < 0 || grade > 10) throw new Error('Nota fora do intervalo de 0 a 10.');
+  });
+  if (!['', '1º bimestre', '2º bimestre'].includes(values[6] || '')) throw new Error('Bimestre substituído inválido.');
+  if (!['Pendente', 'Concluído'].includes(values[7])) throw new Error('Status inválido.');
+  return values.map(sanitizeCell_);
+}
+
 function saveRecoveryBatch(records) {
   if (!Array.isArray(records)) throw new Error('Lote inválido.');
   const book = getDatabase_();
   const sheet = book.getSheetByName('Recuperação');
   const user = Session.getActiveUser().getEmail() || 'usuário institucional';
   const now = new Date();
-  const values = records.map(row => [now, user, row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7]]);
+  const values = records.map(row => [now, user, ...validateRecoveryRecord_(row)]);
   if (!values.length) return { saved: 0, updated: 0, inserted: 0, spreadsheetId: book.getId() };
 
   // Autosalvamento deve atualizar o registro existente, nunca duplicá-lo.
