@@ -32,8 +32,9 @@ $$('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset
 restoreLocal();tableRows();recoveryRows();renderClasses();renderMinutes();renderOverview();
 
 function persistBatch(){persistLocal();if(typeof google==='undefined'||!google.script?.run)return;google.script.run.withFailureHandler(error=>console.error('Falha ao salvar lote:',error)).saveRecoveryBatch(recoveryData)}
+function canonicalizeImportedRecords(parsed){const maps={aluno:new Map(),turma:new Map(),disciplina:new Map()};for(const file of parsed){for(const record of file.records||[]){for(const field of Object.keys(maps)){const key=normal(record[field]);if(maps[field].has(key))record[field]=maps[field].get(key);else maps[field].set(key,record[field])}}}return parsed}
 const importedHandler=showImported;
-showImported=function(parsed){importedHandler(parsed);persistBatch()};
+showImported=function(parsed){importedHandler(canonicalizeImportedRecords(parsed));persistBatch()};
 function validateRecoveryScore(event){if(!event.target.matches('.score-input'))return;const raw=event.target.value.trim().replace(',','.');if(raw===''){event.target.setCustomValidity('');return}const score=Number(raw);if(Number.isFinite(score)&&score>=0&&score<=10){event.target.setCustomValidity('');return}event.preventDefault();event.stopImmediatePropagation();const row=recoveryData[Number(event.target.dataset.index)];event.target.value=row&&row[5]!=='—'?String(row[5]).replace(',','.'):'';event.target.setCustomValidity('Informe uma nota entre 0 e 10.');event.target.reportValidity();toast('Nota inválida. Informe um valor entre 0 e 10.')}
 document.addEventListener('change',validateRecoveryScore,true);
 document.addEventListener('change',event=>{if(event.target.matches('.score-input,.replacement-select'))persistBatch()});
