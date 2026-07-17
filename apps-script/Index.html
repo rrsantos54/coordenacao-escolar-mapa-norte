@@ -23,18 +23,18 @@
         </nav>
         <div class="sidebar-bottom">
           <div class="school-card"><span class="school-dot"></span><div><strong>Waldomiro Sampaio</strong><small>Ano letivo 2026</small></div></div>
-          <button class="profile"><span class="avatar">RS</span><span>Rogério Santos</span><span class="chevron">⌄</span></button>
+          <button class="profile"><span class="avatar">CO</span><span>Coordenação</span><span class="chevron">⌄</span></button>
         </div>
       </aside>
 
       <main class="main-content">
         <header class="topbar">
           <div><p class="eyebrow">Quarta-feira, 16 julho 2026</p><h1 id="page-title">Visão geral</h1></div>
-          <div class="top-actions"><button class="icon-button" aria-label="Notificações">♧<span class="notification-dot"></span></button><button class="user-button"><span class="avatar small">RS</span> Rogério <span>⌄</span></button></div>
+          <div class="top-actions"><button class="icon-button" aria-label="Notificações">♧<span class="notification-dot"></span></button><button class="user-button"><span class="avatar small">CO</span> Coordenação <span>⌄</span></button><button class="filter-button" id="clear-session" type="button">Limpar sessão</button></div>
         </header>
 
         <section class="view active" id="overview-view">
-          <div class="welcome-row"><div><h2>Bom trabalho, Rogério.</h2><p>Seu lote está quase pronto para conferência.</p></div><button class="primary-button" id="open-upload"><span>＋</span> Importar lote</button></div>
+          <div class="welcome-row"><div><h2>Painel da coordenação.</h2><p>Seu lote está quase pronto para conferência.</p></div><button class="primary-button" id="open-upload"><span>＋</span> Importar lote</button></div>
 
           <div class="metric-grid">
             <article class="metric-card featured"><div class="metric-label">Alunos em recuperação <span class="status-pill">● aguardando</span></div><strong class="metric-value">00</strong><p>Importe um lote para começar</p><div class="sparkline"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
@@ -63,7 +63,7 @@
 
     <div class="modal-backdrop" id="upload-modal" aria-hidden="true"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><button class="modal-close" id="close-upload" aria-label="Fechar">×</button><p class="eyebrow">Novo processamento</p><h2 id="modal-title">Importar lote</h2><p>Selecione uma pasta com planilhas do 1º e 2º bimestre. App identifica turmas automaticamente.</p><label class="dropzone" for="folder-input"><span class="upload-symbol">↥</span><strong>Arraste arquivos aqui</strong><small>ou clique para selecionar arquivos .xlsx</small><input id="folder-input" type="file" accept=".xlsx,.xls" multiple /></label><div class="modal-note"><span>i</span> Arquivos originais permanecem intactos.</div></div></div>
     <div class="toast" id="toast" role="status"></div>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" integrity="sha384-EnyY0/GSHQGSxSgMwaIPzSESbqoOLSexfnSMN2AP+39Ckmn92stwABZynq1JyzdT" crossorigin="anonymous"></script>
     <?!= include('app'); ?>
   </body>
 </html>
