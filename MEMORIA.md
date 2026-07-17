@@ -64,3 +64,18 @@ Atualizado em 17/07/2026.
 2. Conferir conta institucional usada no Google Apps Script.
 3. Testar geração final de DOCX com duas notas de recuperação quando aluno tiver pendência nos dois bimestres.
 4. Atualizar teste antigo para não considerar armazenamento artificial em `sessionStorage` como falha do aplicativo.
+
+## Atualização final — 17/07/2026
+
+- Modo simples multi-escola publicado no mesmo link.
+- Campo Nome da escola adicionado.
+- Nome pode ser detectado pelo nome do arquivo ou metadados das primeiras linhas do Mapão.
+- Botão Atualizar adicionado; preserva lote temporário da aba.
+- Botão Limpar sessão mantém exclusão manual dos dados.
+- Upload aceita até 50 arquivos por lote.
+- Arquivos válidos continuam processando quando outro arquivo falha.
+- Lotes sucessivos são mesclados; dados anteriores não são apagados.
+- Registros marcados como Transferido, Transferida, Transferência, Baixa de transferência ou Matrícula baixada são excluídos.
+- PRs recentes: 4 multi-escola, 5 persistência, 7 mesclagem, 8 lote grande, 9 transferidos, 10 Atualizar, 11 coluna de situação, 12 nome do Mapão.
+- Site: https://rrsantos54.github.io/coordenacao-escolar-mapa-norte/
+- Ao retomar: testar com Mapão real contendo coluna de situação de transferência e confirmar nome da escola detectado.
