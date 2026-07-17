@@ -48,4 +48,5 @@ document.addEventListener('change',event=>{if(event.target.id!=='folder-input')r
 document.addEventListener('change',event=>{if(event.target.matches('.score-input,.replacement-select'))persistBatch()});
 $('#school-name').addEventListener('input',event=>{schoolName=event.target.value.trim();renderMinutes()});
 $('#folder-input').onchange=async e=>{if(!e.target.files.length)return;toast('Lendo planilhas…');const results=await Promise.allSettled([...e.target.files].map(extractWorkbook));const parsed=results.filter(result=>result.status==='fulfilled').map(result=>result.value);const failed=results.filter(result=>result.status==='rejected');failed.forEach(result=>console.error(result.reason));if(parsed.length)showImported(parsed);if(failed.length)toast(`${parsed.length} arquivos processados; ${failed.length} ignorados por erro.`)};
+const rawExtractWorkbook=extractWorkbook;extractWorkbook=async file=>{const result=await rawExtractWorkbook(file);result.records=result.records.filter(record=>!/(BAIXA\s+DE\s+TRANSFER|TRANSFERID[OA]|TRANSFER[ÊE]NCIA|MATR[IÍ]CULA\s+BAIXADA)/i.test(`${record.aluno} ${record.turma} ${record.disciplina}`));return result};
 </script>
