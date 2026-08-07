@@ -29,15 +29,18 @@ Atualizado em 17/07/2026.
 - Domínios padrão permitidos: `professor.educacao.sp.gov.br` e `educacao.sp.gov.br`.
 - Validação de campos, notas, status, bimestre e tamanho.
 - Limite de 2.000 registros por lote.
-- Limite de 10 arquivos e 15 MB por arquivo.
+- Limite de 50 arquivos e 15 MB por arquivo, conforme `MAX_UPLOAD_FILES` e `MAX_UPLOAD_BYTES` em `app.js`.
 - `LockService` para gravações concorrentes.
 - Proteção contra fórmula maliciosa em planilhas.
 - CSP, SRI e `crossorigin` para SheetJS.
 - Bloqueio contra clickjacking.
-- Dados dos alunos não ficam persistidos em `sessionStorage`.
+- Dados dos alunos ficam em `sessionStorage`, na chave `mapa-norte-session-v2`, desde o PR 5. A afirmação anterior de que nada era persistido valia só até o PR 4. Não há `localStorage` nem `IndexedDB`, e o armazenamento é descartado ao fechar a aba.
 - Secret scanning, push protection e Dependabot ativados.
 - GitHub Actions com ações fixadas por SHA.
-- Branch `main` protegida: revisão obrigatória, histórico linear, resolução de conversas, sem force-push e sem exclusão.
+- Branch `main` protegida: histórico linear, resolução de conversas, sem force-push, sem exclusão e `enforce_admins` ativo.
+- Revisão deixou de ser obrigatória em 07/08/2026. `required_approving_review_count` foi para 0 e `require_last_push_approval` para false. Motivo: com um único mantenedor, o GitHub não permite aprovar o próprio PR, e as duas regras juntas travavam qualquer merge de forma permanente.
+- Consequência: PRs entram na `main` sem aprovação. O portão de qualidade agora é a conferência antes de abrir o PR, não a revisão.
+- Para restaurar a exigência caso o repositório ganhe outro mantenedor: `required_approving_review_count` de volta para 1 e `require_last_push_approval` para true.
 
 ## Deploy
 
