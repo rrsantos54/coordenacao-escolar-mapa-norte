@@ -79,3 +79,17 @@ Atualizado em 17/07/2026.
 - PRs recentes: 4 multi-escola, 5 persistência, 7 mesclagem, 8 lote grande, 9 transferidos, 10 Atualizar, 11 coluna de situação, 12 nome do Mapão.
 - Site: https://rrsantos54.github.io/coordenacao-escolar-mapa-norte/
 - Ao retomar: testar com Mapão real contendo coluna de situação de transferência e confirmar nome da escola detectado.
+
+## Validação com Mapão real — 17/07/2026
+
+- Causa da divergência no 6º ano identificada: a lista antiga trazia 21 registros porque incluía ANA LAURA SOUSA DA SILVA, marcada como `Transferido` no Mapão.
+- Alunos transferidos ou baixados sem nota vermelha nunca entravam na lista; só esse caso tinha nota inferior a 5,0.
+- Teste público com dois Mapões reais retornou 20 alunos em recuperação, valor correto.
+- Deploy do Pages e do Apps Script concluídos em 17/07/2026.
+- Se outro computador continuar mostrando 21: abrir a URL do Pages, clicar `Limpar sessão`, clicar `Atualizar` e reimportar os dois arquivos. Persistindo, o endereço aberto é a URL antiga do Apps Script ou uma página em cache.
+- Persistência do lote depende da versão do `app.js` em uso:
+  - Até o PR 4, `persistLocal` e `restoreLocal` eram funções vazias. Nada era salvo; recarregar a página zerava o lote.
+  - Do PR 5 em diante, o lote e o nome da escola vão para `sessionStorage` na chave `mapa-norte-session-v2` e são restaurados por `restoreLocal`.
+- `sessionStorage` vive por aba: sobrevive a recarregar e ao botão `Atualizar`, mas é descartado ao fechar a aba. Não há `localStorage` nem `IndexedDB`.
+- Gravação em planilha só ocorre pelo Web App do Apps Script. `persistBatch` chama `google.script.run.saveRecoveryBatch`, e sai cedo quando `google` é indefinido — que é o caso no GitHub Pages e ao abrir o arquivo local.
+- Abrir o `index.html` por `file://` roda uma cópia local, que pode estar atrás do remoto. A CSP da página usa `default-src 'self'`, restritiva sob `file://`. Usar sempre a URL do Pages.
