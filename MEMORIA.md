@@ -36,7 +36,9 @@ Atualizado em 17/07/2026.
 - Bloqueio contra clickjacking.
 - Persistência do lote no `app.js` do Pages, por fase: nada até o PR 4, `sessionStorage` do PR 5 até 07/08/2026, `localStorage` a partir daí. Chave `mapa-norte-session-v2` em todas.
 - Com `localStorage`, os dados dos alunos passam a ficar gravados em disco no navegador, sem prazo de expiração, e sobrevivem a fechar a aba e o navegador. `Limpar sessão` é o único caminho para apagá-los.
-- Em computador compartilhado da escola, clicar `Limpar sessão` ao terminar deixa de ser opcional.
+- Para limitar a retenção, o lote expira sozinho em 12 horas: `persistLocal` grava um `ts`, e `restoreLocal` apaga a chave e ignora o lote quando `Date.now()-ts` passa de `MAX_STORAGE_AGE_MS`. Lote gravado sem `ts`, anterior a essa mudança, é descartado.
+- O prazo de 12 horas cobre o dia de trabalho e mata o dado de um dia para o outro, sem depender de alguém lembrar do botão.
+- Em computador compartilhado da escola, clicar `Limpar sessão` ao terminar continua sendo a forma de apagar na hora.
 - A cópia do Apps Script em `apps-script/app.html` segue em `sessionStorage` de propósito: ali o dado real vai para a planilha do Google, então o storage é só cache e não há motivo para gravá-lo em disco.
 - Não há `IndexedDB` em nenhuma das versões.
 - Secret scanning, push protection e Dependabot ativados.
