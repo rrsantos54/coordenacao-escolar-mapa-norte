@@ -18,6 +18,8 @@ Atualizado em 17/07/2026.
 - Identifica nota inferior a 5,0.
 - Permite nota de recuperação semestral em dropdown de 1 a 10, mais a opção `Não realizou a prova`.
 - Marcar `Não realizou` conclui o registro sem nota: não há bimestre a substituir, então o seletor de bimestre é desabilitado e limpo.
+- Ao marcar `Não realizou`, o app oferece aplicar às demais disciplinas do mesmo aluno, por um modal de confirmação que informa quantas linhas serão afetadas e quantas já têm nota lançada. `Aplicar a todas` sobrescreve nota existente e não tem desfazer; `Só esta linha` e `Esc` cancelam.
+- O aluno é identificado por nome mais turma, a mesma chave da mesclagem de lotes, então homônimo em outra turma não é atingido.
 - Permite substituição do primeiro ou segundo bimestre.
 - Mantém notas anterior e atualizada na ATA.
 - Gera ATA sem abreviações desnecessárias.
@@ -67,6 +69,19 @@ Atualizado em 17/07/2026.
 - Dropdown de recuperação: opções de 1 a 10 e `Não realizou a prova`.
 - Lote acima de 2.000 registros: rejeitado.
 - Teste antigo de privacidade ainda injeta manualmente uma chave em `sessionStorage`; resultado negativo desse teste é obsoleto. Código atual não grava dados nessa chave.
+- Propagação de `Não realizou`, verificada em 07/08/2026: aplicar a todas marca as demais disciplinas do aluno e sobrescreve nota existente; `Só esta linha` e `Esc` preservam; homônimo em outra turma fica de fora; aluno com disciplina única não abre o modal; nota numérica comum não abre o modal.
+- Expiração de 12 horas do lote, verificada: 1 minuto e 11 horas sobrevivem, 13 horas é descartado, lote sem `ts` é descartado.
+
+## Como testar mudanças antes de publicar
+
+- Servir a pasta local por HTTP e abrir no navegador: `python3 -m http.server 8899`, depois `http://localhost:8899/index.html`. Abrir por `file://` não funciona bem por causa da CSP `default-src 'self'`.
+- Testar o caminho que o usuário percorre, não só a função alterada. O bug do PR 20 passou por um check que exercitava `rowStatus` e o texto do fonte, mas nunca o `change` no dropdown, onde estava a rejeição.
+
+## Cache depois do deploy
+
+- Depois de publicar, o navegador continua servindo o `app.js` antigo. Recarregar a página não resolve, e acrescentar parâmetro na URL também não: o `<script src="app.js">` tem cache próprio.
+- Só `Cmd+Shift+R` traz a versão nova. Verificar com `validateRecoveryScore.toString()` no console se há dúvida sobre qual versão está rodando.
+- Esse é o mesmo tipo de engano que motivou toda a investigação de 07/08/2026, quando uma cópia local defasada parecia ser a versão publicada.
 
 ## Próximo retorno
 
@@ -74,6 +89,16 @@ Atualizado em 17/07/2026.
 2. Conferir conta institucional usada no Google Apps Script.
 3. Testar geração final de DOCX com duas notas de recuperação quando aluno tiver pendência nos dois bimestres.
 4. Atualizar teste antigo para não considerar armazenamento artificial em `sessionStorage` como falha do aplicativo.
+5. Corrigir a ordem do nome da escola extraído do Mapão. Em 07/08/2026, com lote real, saiu `Waldomiro Sampaio de Souza Prefeito`; o correto é `PREF. WALDOMIRO SAMPAIO DE SOUZA`. O campo é editável na tela, então não bloqueia o uso, mas sai invertido no cabeçalho da ATA.
+6. Decidir se a proteção da branch `main` volta a exigir revisão. Hoje `required_approving_review_count` é 0 e `require_last_push_approval` é false.
+7. Conferir a ATA gerada a partir de lote real com aluno marcado como `Não realizou`. A lógica está verificada com dados sintéticos; o encaixe com planilha de verdade, não.
+
+## Sessão de 07/08/2026
+
+- Origem: lote sumia ao reabrir o `index.html`. Eram duas causas somadas — a cópia local estava num commit anterior ao PR 5, quando `persistLocal` e `restoreLocal` eram funções vazias, e essa mesma cópia não tinha os filtros de transferência dos PRs 9, 11 e 15.
+- PRs mesclados: 16 e 17 de documentação, 18 `localStorage` com expiração, 19 opção `Não realizou`, 20 correção do validador, 21 propagação entre disciplinas.
+- PR 20 corrigiu um defeito introduzido pelo 19: `validateRecoveryScore` roda em fase de captura e rejeitava `Não realizou`, porque `Number('Não realizou')` é `NaN`. A opção aparecia no dropdown e não funcionava.
+- Lote real conferido na sessão: 483 registros, 93 alunos, 7 turmas, e 71 alunos com mais de uma disciplina — que são os atendidos pela propagação.
 
 ## Atualização final — 17/07/2026
 
