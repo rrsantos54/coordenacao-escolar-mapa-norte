@@ -16,12 +16,13 @@ Atualizado em 17/07/2026.
 - Importa lotes de planilhas do primeiro e segundo bimestres.
 - Separa turma, aluno, componente curricular e bimestre.
 - Identifica nota inferior a 5,0.
-- Permite nota de recuperação semestral em dropdown de 1 a 10.
+- Permite nota de recuperação semestral em dropdown de 1 a 10, mais a opção `Não realizou a prova`.
+- Marcar `Não realizou` conclui o registro sem nota: não há bimestre a substituir, então o seletor de bimestre é desabilitado e limpo.
 - Permite substituição do primeiro ou segundo bimestre.
 - Mantém notas anterior e atualizada na ATA.
 - Gera ATA sem abreviações desnecessárias.
 - Exclui salas de teste.
-- Botão “Limpar sessão” remove dados carregados da memória da página.
+- Botão “Apagar dados”, antes “Limpar sessão”, remove o lote da página e do `localStorage`.
 
 ## Segurança aplicada
 
@@ -35,10 +36,10 @@ Atualizado em 17/07/2026.
 - CSP, SRI e `crossorigin` para SheetJS.
 - Bloqueio contra clickjacking.
 - Persistência do lote no `app.js` do Pages, por fase: nada até o PR 4, `sessionStorage` do PR 5 até 07/08/2026, `localStorage` a partir daí. Chave `mapa-norte-session-v2` em todas.
-- Com `localStorage`, os dados dos alunos passam a ficar gravados em disco no navegador, sem prazo de expiração, e sobrevivem a fechar a aba e o navegador. `Limpar sessão` é o único caminho para apagá-los.
+- Com `localStorage`, os dados dos alunos passam a ficar gravados em disco no navegador, sem prazo de expiração, e sobrevivem a fechar a aba e o navegador. `Apagar dados` é o único caminho para apagá-los na hora.
 - Para limitar a retenção, o lote expira sozinho em 12 horas: `persistLocal` grava um `ts`, e `restoreLocal` apaga a chave e ignora o lote quando `Date.now()-ts` passa de `MAX_STORAGE_AGE_MS`. Lote gravado sem `ts`, anterior a essa mudança, é descartado.
 - O prazo de 12 horas cobre o dia de trabalho e mata o dado de um dia para o outro, sem depender de alguém lembrar do botão.
-- Em computador compartilhado da escola, clicar `Limpar sessão` ao terminar continua sendo a forma de apagar na hora.
+- Em computador compartilhado da escola, clicar `Apagar dados` ao terminar continua sendo a forma de apagar na hora.
 - A cópia do Apps Script em `apps-script/app.html` segue em `sessionStorage` de propósito: ali o dado real vai para a planilha do Google, então o storage é só cache e não há motivo para gravá-lo em disco.
 - Não há `IndexedDB` em nenhuma das versões.
 - Secret scanning, push protection e Dependabot ativados.
@@ -63,7 +64,7 @@ Atualizado em 17/07/2026.
 - Backend: 14/14.
 - XSS, fórmula, protótipo, upload falso e fuzzing: passou.
 - Clickjacking: passou.
-- Dropdown de recuperação: opções de 1 a 10.
+- Dropdown de recuperação: opções de 1 a 10 e `Não realizou a prova`.
 - Lote acima de 2.000 registros: rejeitado.
 - Teste antigo de privacidade ainda injeta manualmente uma chave em `sessionStorage`; resultado negativo desse teste é obsoleto. Código atual não grava dados nessa chave.
 
@@ -80,7 +81,7 @@ Atualizado em 17/07/2026.
 - Campo Nome da escola adicionado.
 - Nome pode ser detectado pelo nome do arquivo ou metadados das primeiras linhas do Mapão.
 - Botão Atualizar adicionado; preserva lote temporário da aba.
-- Botão Limpar sessão mantém exclusão manual dos dados.
+- Botão Apagar dados mantém exclusão manual dos dados.
 - Upload aceita até 50 arquivos por lote.
 - Arquivos válidos continuam processando quando outro arquivo falha.
 - Lotes sucessivos são mesclados; dados anteriores não são apagados.
@@ -95,7 +96,7 @@ Atualizado em 17/07/2026.
 - Alunos transferidos ou baixados sem nota vermelha nunca entravam na lista; só esse caso tinha nota inferior a 5,0.
 - Teste público com dois Mapões reais retornou 20 alunos em recuperação, valor correto.
 - Deploy do Pages e do Apps Script concluídos em 17/07/2026.
-- Se outro computador continuar mostrando 21: abrir a URL do Pages, clicar `Limpar sessão`, clicar `Atualizar` e reimportar os dois arquivos. Persistindo, o endereço aberto é a URL antiga do Apps Script ou uma página em cache.
+- Se outro computador continuar mostrando 21: abrir a URL do Pages, clicar `Apagar dados`, clicar `Atualizar` e reimportar os dois arquivos. Persistindo, o endereço aberto é a URL antiga do Apps Script ou uma página em cache.
 - Persistência do lote depende da versão do `app.js` em uso:
   - Até o PR 4, `persistLocal` e `restoreLocal` eram funções vazias. Nada era salvo; recarregar a página zerava o lote.
   - Do PR 5 em diante, o lote e o nome da escola vão para `sessionStorage` na chave `mapa-norte-session-v2` e são restaurados por `restoreLocal`.
