@@ -297,56 +297,27 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   eq(parsed.records.map(r => r.aluno), ['ALUNO DE VERDADE'], 'a leitura para na legenda');
 }
 
-// ------------------------------------------- as duas cópias não podem divergir
-// O app roda em dois lugares: app.js no GitHub Pages e apps-script/app.html no
-// Web App. As regras de leitura do Mapão são as mesmas nos dois, e já
-// aconteceu de uma correção entrar só num lado. Este bloco quebra se isso voltar
-// a acontecer. O resto dos dois arquivos pode divergir à vontade — só estas
-// declarações são compartilhadas.
-{
-  const twin = readFileSync(new URL('./apps-script/app.html', import.meta.url), 'utf8');
-  const COMPARTILHADAS = [
-    /^function normal\(v\).*$/m,
-    /^const SCHOOL_TITLES=.*$/m,
-    /^function normalizeSchoolName\(name\).*$/m,
-    /^const TURMA_RE=.*$/m,
-    /^const TURMA_NOME_RE=.*$/m,
-    /^const TRANSFER_RE=.*$/m,
-    /^const SEM_PROVA_RECUPERACAO=.*$/m,
-    /^function temProvaDeRecuperacao\(disciplina\).*$/m,
-    /^function droppedStudents\(rows\).*$/m,
-    /^function cleanSubject\(v\).*$/m,
-    /^function cleanClassName\(v\).*$/m,
-    /^function parseNumber\(v\).*$/m,
-    /^function findTurma\(rows,fileName\).*$/m,
-    /^function bimester\(name,metadata=\[\]\).*$/m,
-    /^function subjectPeriod\(v,fallback\).*$/m,
-  ];
-  for (const re of COMPARTILHADAS) {
-    const noApp = source.match(re);
-    const noTwin = twin.match(re);
-    ok(noTwin, `apps-script/app.html não tem a declaração: ${re}`);
-    eq(noTwin[0].trim(), noApp[0].trim(), `app.js e apps-script/app.html divergiram em: ${re}`);
-  }
-}
-
-// ------------------------------------------------------- os dois arquivos compilam
+// --------------------------------------------------------- o app.js compila
 // Envolver em função declara sem executar: erro de sintaxe estoura no import,
 // mas nenhuma linha que toca DOM chega a rodar.
 {
-  const compila = async (nome, corpo) => {
-    try {
-      await import('data:text/javascript,' + encodeURIComponent(`function __check(){\n${corpo}\n}`));
-      ok(true, `${nome} compila`);
-    } catch (e) {
-      ok(false, `${nome} tem erro de sintaxe: ${e.message}`);
-    }
-  };
-  await compila('app.js', source);
-  const twinHtml = readFileSync(new URL('./apps-script/app.html', import.meta.url), 'utf8');
-  const blocos = [...twinHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-  ok(blocos.length > 0, 'apps-script/app.html tem bloco <script>');
-  await compila('apps-script/app.html', blocos.join('\n'));
+  try {
+    await import('data:text/javascript,' + encodeURIComponent(`function __check(){\n${source}\n}`));
+    ok(true, 'app.js compila');
+  } catch (e) {
+    ok(false, `app.js tem erro de sintaxe: ${e.message}`);
+  }
+}
+
+// --------------------------------------------- não pode voltar a existir cópia
+// O parser já morou em dois lugares, app.js e apps-script/app.html, e uma
+// correção chegou a entrar só num lado. O Apps Script foi aposentado em
+// 08/08/2026 justamente para acabar com essa classe de defeito. Se um segundo
+// parser aparecer no repositório, este teste avisa.
+{
+  const { readdirSync } = await import('node:fs');
+  const raiz = readdirSync(new URL('.', import.meta.url));
+  ok(!raiz.includes('apps-script'), 'apps-script voltou ao repositório: existe um segundo parser para manter em dia');
 }
 
 console.log(`ok — ${checks} verificações`);
