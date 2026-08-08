@@ -310,7 +310,35 @@ function montarApp() {
   ok(errosDeConsole.some(e => e.includes('ALUNO não encontrado')), 'e registra no console qual arquivo falhou');
 }
 
-// ============================ 12. o uso normal não escreve nada no console
+// =================== 12. nome da escola digitado à mão também é normalizado
+// O Mapão consolidado não traz a escola, então digitar é o caminho normal.
+// Sem normalizar aqui, o título honorífico ia cru para a ATA.
+{
+  const { window, doc, app, subirLote } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  const campo = doc.querySelector('#school-name');
+
+  // Enquanto digita, o texto é preservado como está.
+  campo.value = 'Waldomiro Sampaio de Souza Prefeito';
+  campo.dispatchEvent(new window.Event('input', { bubbles: true }));
+  eq(app.schoolName, 'Waldomiro Sampaio de Souza Prefeito', 'digitando, o texto não é mexido');
+
+  // Ao sair do campo, vira o formato da ATA.
+  campo.dispatchEvent(new window.Event('change', { bubbles: true }));
+  eq(campo.value, 'PREF. WALDOMIRO SAMPAIO DE SOUZA', 'ao sair do campo, o nome é normalizado');
+  eq(app.schoolName, 'PREF. WALDOMIRO SAMPAIO DE SOUZA', 'e o estado acompanha');
+
+  app.renderAta(TURMA_A_NOME);
+  const cabecalho = doc.querySelector('.paper-center').textContent;
+  ok(cabecalho.includes('E.E. “PREF. WALDOMIRO SAMPAIO DE SOUZA”'), 'e a ATA sai com o nome certo');
+  ok(!cabecalho.includes('Souza Prefeito'), 'sem o título honorífico no fim');
+
+  // Nome já correto não é mexido de novo.
+  campo.dispatchEvent(new window.Event('change', { bubbles: true }));
+  eq(campo.value, 'PREF. WALDOMIRO SAMPAIO DE SOUZA', 'normalizar duas vezes não altera');
+}
+
+// ============================ 13. o uso normal não escreve nada no console
 // Erro ou aviso inesperado no console é sintoma; aqui vira falha de teste.
 {
   const { doc, app, subirLote, errosDeConsole } = montarApp();
