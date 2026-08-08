@@ -20,10 +20,12 @@ const modulo = [
   grab(/^const TURMA_NOME_RE=.*$/m),
   grab(/^const TRANSFER_RE=.*$/m),
   grab(/^function droppedStudents\(rows\).*$/m),
-  'export { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents };',
+  grab(/^const SEM_PROVA_RECUPERACAO=.*$/m),
+  grab(/^function temProvaDeRecuperacao\(disciplina\).*$/m),
+  'export { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents, temProvaDeRecuperacao };',
 ].join('\n');
 
-const { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents } = await import(
+const { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents, temProvaDeRecuperacao } = await import(
   'data:text/javascript,' + encodeURIComponent(modulo)
 );
 
@@ -124,4 +126,26 @@ const comAcento = droppedStudents([cabecalho, ['', 'Transferido', ''], ['JOÃO D
 assert.ok(comAcento.has('JOAO DA SILVA'), 'chave é comparada sem acento');
 assert.equal(comAcento.size, 1);
 
-console.log(`ok — ${escolas.length} casos de escola, ${turmas.length} de turma, 4 de TURMA_RE, 9 de droppedStudents`);
+// --- componentes sem prova de recuperação ---------------------------------
+// FAQ da Recuperação Semestral 2026, item 6.1.
+const semProva = ['ARTE', 'Arte', 'EDUCACAO FISICA', 'Educação Física', 'PROJETO DE VIDA', 'REDAÇAO E LEITURA', 'Redação e Leitura'];
+for (const d of semProva) {
+  assert.equal(temProvaDeRecuperacao(d), false, `devia ficar fora: ${d}`);
+}
+
+// Os componentes da Prova Paulista continuam entrando.
+const comProva = ['MATEMATICA', 'LINGUA PORTUGUESA', 'HISTORIA', 'GEOGRAFIA', 'CIENCIAS', 'BIOLOGIA', 'FISICA', 'QUIMICA', 'FILOSOFIA', 'SOCIOLOGIA', 'LINGUA INGLESA'];
+for (const d of comProva) {
+  assert.equal(temProvaDeRecuperacao(d), true, `devia entrar: ${d}`);
+}
+
+// ESPORTE-MUSICA-ARTE termina em ARTE e não pode ser pego pela exclusão.
+assert.equal(temProvaDeRecuperacao('ESPORTE-MUSICA-ARTE'), true, 'comparação é exata, não por trecho');
+
+// Componentes de itinerário seguem na lista até a Diretoria de Ensino confirmar.
+for (const d of ['ORIENTAÇAO DE ESTUDO - MATEMATICA', 'PRATICAS EXPERIMENTAIS', 'ROBOTICA', 'ELETIVAS']) {
+  assert.equal(temProvaDeRecuperacao(d), true, `ainda não é para excluir: ${d}`);
+}
+
+const totalSemProva = semProva.length + comProva.length + 1 + 4;
+console.log(`ok — ${escolas.length} casos de escola, ${turmas.length} de turma, 4 de TURMA_RE, 9 de droppedStudents, ${totalSemProva} de temProvaDeRecuperacao`);
