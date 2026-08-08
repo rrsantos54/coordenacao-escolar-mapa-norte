@@ -118,6 +118,46 @@ Atualizado em 17/07/2026.
 - `test-parser.mjs` criado. Roda com `node test-parser.mjs`, sem dependência. Lê as declarações direto do `app.js` para não virar uma segunda cópia das regras. 13 casos de nome de escola, 7 de turma, 4 de `TURMA_RE`.
 - Proteção da branch `main` voltou a exigir revisão: `required_approving_review_count` 1 e `require_last_push_approval` true, com `enforce_admins` ativo. Consequência conhecida e aceita: com um único mantenedor, nenhum PR mescla e nem push direto na `main` passa. Reverter é o inverso do que está no item de 07/08.
 
+## Como o app é testado
+
+- `node test-parser.mjs` — 133 verificações, sem dependência e sem rede. É o portão antes de qualquer PR.
+- O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
+- Cobre: nome de escola, turma pelos dois layouts, exclusão de transferidos, componentes sem prova, leitura de nota, `parseSheet` nos dois formatos de Mapão, detecção de escola, combinação de bimestres, mesclagem de lotes, status da linha, bloco de legenda e limpeza de rótulo.
+- Cobre também duas coisas que não são lógica: que `app.js` e `apps-script/app.html` não divergiram nas regras compartilhadas, e que os dois arquivos compilam.
+
+### O que o teste automatizado não alcança
+
+Estes dependem de DOM, de `XLSX` e de arquivo real. Foram verificados à mão no navegador em 08/08/2026, contra as 7 turmas reais, e precisam ser refeitos assim que a leitura do Mapão mudar:
+
+- Propagação de `Não realizou`, incluindo o cancelamento por `Esc`.
+- Mesclagem de lotes sucessivos pela tela e reimportação sem duplicar.
+- Expiração de 12 horas do `localStorage`: 11h sobrevive, 13h é descartado, lote sem `ts` é descartado.
+- ATA renderizada, brasão carregado e HTML da janela de impressão.
+- Exportação para Excel.
+- Limites de 2.000 registros, 50 arquivos e 15 MB.
+- Escapamento de HTML em nome de aluno, na tabela e na ATA.
+- `Apagar dados` zerando lista e `localStorage`.
+
+### Método para mudanças no parser
+
+Antes de mexer, tirar a impressão digital de um lote real: importar, ordenar `recoveryData`, juntar com `|` e tirar o SHA-256. Depois da mudança, repetir. Hash igual significa comportamento igual. Foi assim que o refactor de 08/08/2026 foi validado.
+
+Referência em 08/08/2026, com as planilhas desta escola:
+
+| Lote | Registros | Alunos | Escola detectada | Hash |
+|---|---|---|---|---|
+| 7 Mapões consolidados | 453 | 95 | vazio | `06192e6cc5242eb9bbee7e9238654c36` |
+| 14 Mapões por bimestre | 451 | 93 | PREF. WALDOMIRO SAMPAIO DE SOUZA | `48d5ecbaad8f95a16af2c2c9cc0b2948` |
+
+A diferença de 2 registros está explicada: duas alunas do 9º ANO têm nota 4 em `ORIENTAÇÃO DE ESTUDO - MATEMÁTICA` do 2º bimestre que só existe no consolidado. Os conjuntos de alunos são idênticos. É recência de lançamento, não defeito.
+
+## Arquitetura do app.js
+
+- Havia uma base mais seis reatribuições de `extractWorkbook` e `showImported` empilhadas no fim do arquivo. A ordem entre elas decidia o resultado e não estava escrita em lugar nenhum, e cada camada reabria e reparseava a planilha inteira — quatro parses por arquivo.
+- Agora a leitura acontece uma vez em `readSheetRows`, e tudo abaixo dela é função pura sobre o array de linhas do SheetJS: `parseSheet`, `detectSchool`, `keepRecords`, `droppedStudents`, `combineRecords`, `mergeRows`. Essa é a costura que torna o parser testável em Node.
+- `importBatch` é o ponto de entrada do lote e mostra a sequência de cima para baixo: limite de registros, nome da escola, unificação de grafias, combinação e mesclagem com o que já estava na tela.
+- O refactor não mudou nenhum resultado: os dois hashes acima são idênticos antes e depois.
+
 ## Regras da Recuperação Semestral 2026
 
 Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 08/08/2026, baseado na Resolução SEDUC nº 42, de 5 de junho de 2024. Texto conferido por dois extratores independentes, pdf.js e `pdftotext`.
