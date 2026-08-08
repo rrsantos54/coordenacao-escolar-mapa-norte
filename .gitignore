@@ -4,3 +4,11 @@ node_modules/
 
 # Nunca versionar credenciais clasp.
 .clasprc.json
+
+# Nunca versionar planilha de aluno. Mapão tem nome, turma e nota de aluno real,
+# e este repositório publica no GitHub Pages.
+*.xlsx
+*.xls
+
+# Saída do Playwright: snapshot de página guarda o dado que estava na tela.
+.playwright-mcp/
