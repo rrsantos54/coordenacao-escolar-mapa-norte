@@ -18,10 +18,12 @@ const modulo = [
   grab(/^function cleanClassName\(v\).*$/m),
   grab(/^const TURMA_RE=.*$/m),
   grab(/^const TURMA_NOME_RE=.*$/m),
-  'export { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE };',
+  grab(/^const TRANSFER_RE=.*$/m),
+  grab(/^function droppedStudents\(rows\).*$/m),
+  'export { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents };',
 ].join('\n');
 
-const { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE } = await import(
+const { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents } = await import(
   'data:text/javascript,' + encodeURIComponent(modulo)
 );
 
@@ -86,4 +88,40 @@ assert.ok(TURMA_RE.test('1ª SERIE A'), 'TURMA_RE devia achar SERIE');
 assert.ok(TURMA_RE.test('2ª Série B'), 'TURMA_RE devia achar Série acentuado');
 assert.ok(!TURMA_RE.test('ANUAL 9H'), 'TURMA_RE não devia casar texto solto');
 
-console.log(`ok — ${escolas.length} casos de escola, ${turmas.length} de turma, 4 de TURMA_RE`);
+// --- exclusão de transferidos ---------------------------------------------
+// A situação é da linha, não do aluno.
+const cabecalho = ['ALUNO', 'SITUAÇÃO', 'MATEMATICA (1B)'];
+
+// Caso real da 1ª SÉRIE A: quatro linhas para a mesma aluna, duas de baixa e
+// duas ativas. Ela continua matriculada, então nenhuma linha dela sai.
+const lauanda = droppedStudents([
+  cabecalho,
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Baixa - Transferência', ''],
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Baixa - Transferência', '4'],
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Ativo', '3'],
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Ativo', '3'],
+]);
+assert.equal(lauanda.size, 0, 'aluna com linha ativa não pode ser excluída');
+
+// Aluno só com linha de transferência continua fora da lista.
+const so_transferido = droppedStudents([
+  cabecalho,
+  ['ANTONIO CARLOS SOUSA DA SILVA', 'Transferido', '2'],
+  ['OUTRO ALUNO ATIVO', 'Ativo', '3'],
+]);
+assert.ok(so_transferido.has('ANTONIO CARLOS SOUSA DA SILVA'), 'transferido puro sai');
+assert.ok(!so_transferido.has('OUTRO ALUNO ATIVO'), 'ativo fica');
+assert.equal(so_transferido.size, 1);
+
+// As outras marcas de saída que o Mapão usa.
+for (const marca of ['Transferida', 'Transferência', 'Baixa de transferência', 'Matrícula baixada']) {
+  const saiu = droppedStudents([cabecalho, ['FULANO DE TAL', marca, '2']]);
+  assert.ok(saiu.has('FULANO DE TAL'), `marca não reconhecida: ${marca}`);
+}
+
+// Linha sem nome não vira chave, e acento não muda o resultado.
+const comAcento = droppedStudents([cabecalho, ['', 'Transferido', ''], ['JOÃO DA SILVA', 'Transferido', '2']]);
+assert.ok(comAcento.has('JOAO DA SILVA'), 'chave é comparada sem acento');
+assert.equal(comAcento.size, 1);
+
+console.log(`ok — ${escolas.length} casos de escola, ${turmas.length} de turma, 4 de TURMA_RE, 9 de droppedStudents`);
