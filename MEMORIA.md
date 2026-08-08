@@ -6,7 +6,7 @@ Atualizado em 17/07/2026.
 
 - Repositório: `rrsantos54/coordenacao-escolar-mapa-norte`.
 - GitHub Pages: https://rrsantos54.github.io/coordenacao-escolar-mapa-norte/
-- Apps Script: implantação ativa protegida por login Google institucional.
+- Apps Script: aposentado em 08/08/2026. A implantação segue no ar até ser arquivada no `script.google.com`; ver a seção própria.
 - Escola: E.E. “PREF. WALDOMIRO SAMPAIO DE SOUZA” - SAGRES.
 - Município: SAGRES.
 - Cabeçalho da ATA configurado conforme dados fornecidos.
@@ -28,7 +28,7 @@ Atualizado em 17/07/2026.
 
 ## Segurança aplicada
 
-- Autorização por conta Google institucional no Apps Script.
+- Autorização por conta Google institucional no Apps Script, enquanto a implantação antiga não for arquivada.
 - Domínios padrão permitidos: `professor.educacao.sp.gov.br` e `educacao.sp.gov.br`.
 - Validação de campos, notas, status, bimestre e tamanho.
 - Limite de 2.000 registros por lote.
@@ -42,7 +42,7 @@ Atualizado em 17/07/2026.
 - Para limitar a retenção, o lote expira sozinho em 12 horas: `persistLocal` grava um `ts`, e `restoreLocal` apaga a chave e ignora o lote quando `Date.now()-ts` passa de `MAX_STORAGE_AGE_MS`. Lote gravado sem `ts`, anterior a essa mudança, é descartado.
 - O prazo de 12 horas cobre o dia de trabalho e mata o dado de um dia para o outro, sem depender de alguém lembrar do botão.
 - Em computador compartilhado da escola, clicar `Apagar dados` ao terminar continua sendo a forma de apagar na hora.
-- A cópia do Apps Script em `apps-script/app.html` segue em `sessionStorage` de propósito: ali o dado real vai para a planilha do Google, então o storage é só cache e não há motivo para gravá-lo em disco.
+- A cópia do Apps Script usava `sessionStorage` de propósito, porque ali o dado real ia para a planilha do Google. Removida em 08/08/2026.
 - Não há `IndexedDB` em nenhuma das versões.
 - Secret scanning, push protection e Dependabot ativados.
 - GitHub Actions com ações fixadas por SHA.
@@ -57,7 +57,7 @@ Atualizado em 17/07/2026.
 - Commit de manifesto Web App: `984afec`.
 - PR 1: segurança e privacidade, merged.
 - PR 2: configuração Web App institucional, merged.
-- Apps Script publicado pela workflow `Publicar Apps Script`.
+- Apps Script publicado pela workflow `Publicar Apps Script` até 08/08/2026, quando o diretório e a workflow foram removidos.
 - Pages publicado pela workflow `pages build and deployment`.
 - Endpoint não autenticado redireciona para login Google; comportamento esperado.
 
@@ -118,6 +118,81 @@ Atualizado em 17/07/2026.
 - `test-parser.mjs` criado. Roda com `node test-parser.mjs`, sem dependência. Lê as declarações direto do `app.js` para não virar uma segunda cópia das regras. 13 casos de nome de escola, 7 de turma, 4 de `TURMA_RE`.
 - Proteção da branch `main` voltou a exigir revisão: `required_approving_review_count` 1 e `require_last_push_approval` true, com `enforce_admins` ativo. Consequência conhecida e aceita: com um único mantenedor, nenhum PR mescla e nem push direto na `main` passa. Reverter é o inverso do que está no item de 07/08.
 
+## Apps Script aposentado — 08/08/2026
+
+O projeto tinha duas cópias do mesmo parser: `app.js` no GitHub Pages e `apps-script/app.html` no Web App do Google. Uma correção já entrou só num lado, e a cópia do Web App nunca teve teste de ponta a ponta porque exige login Google. O `apps-script/` foi removido do repositório, junto com o workflow `Publicar Apps Script` e o `GITHUB_DEPLOY.md`.
+
+O `test-parser.mjs` passou a ter um caso que falha se `apps-script/` reaparecer, para não voltar a existir um segundo parser.
+
+### O que a remoção do código NÃO desliga
+
+Isto é o ponto que importa. Apagar arquivo do repositório não mexe em nada do lado do Google:
+
+1. **A implantação continua no ar.** O Web App segue respondendo na URL antiga até ser removido em `script.google.com` → Implantações → Gerenciar implantações → Arquivar. Enquanto isso, quem tiver o link e conta do domínio ainda consegue usar a versão antiga do app, sem nenhuma das correções de agosto.
+2. **A planilha `Mapa Norte — Base de dados` continua existindo**, no Drive de quem autorizou o Web App. Ela guarda os lotes de recuperação já enviados: nome, turma, disciplina e nota de aluno real. Decidir entre manter como arquivo histórico ou apagar é decisão da escola, não do repositório. O `Code.gs` a criava no primeiro lote salvo, em `getDatabase_()`.
+3. **A credencial do Google continua válida.** O segredo `CLASPRC_JSON` era um token OAuth com escopo de Drive e Sheets. Apagar o segredo no GitHub não revoga o token: é preciso revogar em `myaccount.google.com/permissions`.
+
+Passos do lado do Google e do GitHub, que só a conta institucional executa:
+
+- Arquivar a implantação do Web App em `script.google.com`.
+- Decidir o destino da planilha `Mapa Norte — Base de dados`.
+- Revogar o acesso do clasp em `myaccount.google.com/permissions`.
+- `gh secret delete CLASPRC_JSON`
+- `gh variable delete APPSSCRIPT_WEB_APP_DEPLOYMENT_ID`
+
+Enquanto o item 1 não for feito, existem duas versões do app no ar e elas divergem.
+
+## Como o app é testado
+
+`npm test` roda os dois arquivos e soma 191 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada.
+
+### test-app.mjs — 58 verificações de comportamento
+
+- Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
+- Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
+- Fronteira escolhida: o SheetJS é substituído por um stub. O contrato dele com o app é devolver um array de linhas, e é esse array que o parser consome. Assim os fixtures são arrays legíveis dentro do teste, não há dependência de rede, e **nenhuma planilha de aluno precisa existir para os testes rodarem**. Quem valida o SheetJS de verdade é o navegador.
+- A única dependência do projeto é o `jsdom`, em `devDependencies`.
+- As declarações do `app.js` são `const` de escopo de script e não viram propriedade de `window`. O teste injeta um segundo `<script>` no mesmo escopo para alcançá-las.
+
+### Mutação: a prova de que os testes têm dente
+
+Em 08/08/2026, oito defeitos foram introduzidos de propósito no `app.js`, um de cada vez, e a suíte pegou os oito: não limpar o bimestre no `Não realizou`, voltar a excluir transferido pelo nome, tirar o escape do nome na ATA, remover a expiração de 12 horas, remover o limite de 2.000 registros, voltar a ler o bloco de legenda como aluno, voltar a incluir Arte e Educação Física, e tirar o `base href` da impressão. Vale repetir esse exercício quando a suíte crescer.
+
+### test-parser.mjs — 133 verificações
+
+- Sem dependência e sem rede.
+- O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
+- Cobre: nome de escola, turma pelos dois layouts, exclusão de transferidos, componentes sem prova, leitura de nota, `parseSheet` nos dois formatos de Mapão, detecção de escola, combinação de bimestres, mesclagem de lotes, status da linha, bloco de legenda e limpeza de rótulo.
+- Cobre também duas coisas que não são lógica: que o `app.js` compila, e que `apps-script/` não voltou ao repositório.
+
+### O que o teste automatizado ainda não alcança
+
+Sobraram três, e nenhum tem solução barata:
+
+1. **O SheetJS de verdade.** O `test-app.mjs` usa um stub. Ler um `.xlsx` real continua sendo conferido no navegador, com o método de impressão digital descrito abaixo. Automatizar exigiria versionar uma planilha de fixture, e o `.gitignore` e o workflow bloqueiam planilha no repositório de propósito.
+2. **A implantação antiga do Web App.** O código saiu do repositório em 08/08/2026, mas a implantação continua no ar até ser arquivada no `script.google.com`. Enquanto isso existe uma segunda versão do app, sem as correções de agosto, fora do alcance de qualquer teste.
+3. **Layout e impressão de verdade.** O `jsdom` não faz layout, então largura de coluna, quebra de página e o brasão renderizado seguem conferidos a olho.
+
+### Método para mudanças no parser
+
+Antes de mexer, tirar a impressão digital de um lote real: importar, ordenar `recoveryData`, juntar com `|` e tirar o SHA-256. Depois da mudança, repetir. Hash igual significa comportamento igual. Foi assim que o refactor de 08/08/2026 foi validado.
+
+Referência em 08/08/2026, com as planilhas desta escola:
+
+| Lote | Registros | Alunos | Escola detectada | Hash |
+|---|---|---|---|---|
+| 7 Mapões consolidados | 453 | 95 | vazio | `06192e6cc5242eb9bbee7e9238654c36` |
+| 14 Mapões por bimestre | 451 | 93 | PREF. WALDOMIRO SAMPAIO DE SOUZA | `48d5ecbaad8f95a16af2c2c9cc0b2948` |
+
+A diferença de 2 registros está explicada: duas alunas do 9º ANO têm nota 4 em `ORIENTAÇÃO DE ESTUDO - MATEMÁTICA` do 2º bimestre que só existe no consolidado. Os conjuntos de alunos são idênticos. É recência de lançamento, não defeito.
+
+## Arquitetura do app.js
+
+- Havia uma base mais seis reatribuições de `extractWorkbook` e `showImported` empilhadas no fim do arquivo. A ordem entre elas decidia o resultado e não estava escrita em lugar nenhum, e cada camada reabria e reparseava a planilha inteira — quatro parses por arquivo.
+- Agora a leitura acontece uma vez em `readSheetRows`, e tudo abaixo dela é função pura sobre o array de linhas do SheetJS: `parseSheet`, `detectSchool`, `keepRecords`, `droppedStudents`, `combineRecords`, `mergeRows`. Essa é a costura que torna o parser testável em Node.
+- `importBatch` é o ponto de entrada do lote e mostra a sequência de cima para baixo: limite de registros, nome da escola, unificação de grafias, combinação e mesclagem com o que já estava na tela.
+- O refactor não mudou nenhum resultado: os dois hashes acima são idênticos antes e depois.
+
 ## Regras da Recuperação Semestral 2026
 
 Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 08/08/2026, baseado na Resolução SEDUC nº 42, de 5 de junho de 2024. Texto conferido por dois extratores independentes, pdf.js e `pdftotext`.
@@ -138,7 +213,7 @@ Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 
 4. Decidir a diferença de 2 registros e 2 alunos entre o lote consolidado e o lote por bimestre das mesmas 7 turmas, caso ela importe.
 6. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
 7. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
-5. Republicar o Apps Script: `apps-script/app.html` recebeu as mesmas correções de nome de escola e de turma, mas o brasão não foi para lá. Lá não há arquivo estático servido, então precisaria virar data URI.
+5. Concluir a aposentadoria do Apps Script pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados`, revogar o token do clasp e apagar o segredo e a variável no GitHub. Ver a seção própria.
 
 ## Sessão de 07/08/2026
 

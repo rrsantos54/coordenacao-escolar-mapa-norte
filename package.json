@@ -1,0 +1,13 @@
+{
+  "name": "coordenacao-escolar-mapa-norte",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Processamento da recuperação semestral a partir do Mapão da SEDUC-SP.",
+  "scripts": {
+    "test": "node test-parser.mjs && node test-app.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0"
+  }
+}
