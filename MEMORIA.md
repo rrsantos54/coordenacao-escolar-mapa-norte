@@ -120,23 +120,34 @@ Atualizado em 17/07/2026.
 
 ## Como o app é testado
 
-- `node test-parser.mjs` — 133 verificações, sem dependência e sem rede. É o portão antes de qualquer PR.
+`npm test` roda os dois arquivos e soma 191 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada.
+
+### test-app.mjs — 58 verificações de comportamento
+
+- Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
+- Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
+- Fronteira escolhida: o SheetJS é substituído por um stub. O contrato dele com o app é devolver um array de linhas, e é esse array que o parser consome. Assim os fixtures são arrays legíveis dentro do teste, não há dependência de rede, e **nenhuma planilha de aluno precisa existir para os testes rodarem**. Quem valida o SheetJS de verdade é o navegador.
+- A única dependência do projeto é o `jsdom`, em `devDependencies`.
+- As declarações do `app.js` são `const` de escopo de script e não viram propriedade de `window`. O teste injeta um segundo `<script>` no mesmo escopo para alcançá-las.
+
+### Mutação: a prova de que os testes têm dente
+
+Em 08/08/2026, oito defeitos foram introduzidos de propósito no `app.js`, um de cada vez, e a suíte pegou os oito: não limpar o bimestre no `Não realizou`, voltar a excluir transferido pelo nome, tirar o escape do nome na ATA, remover a expiração de 12 horas, remover o limite de 2.000 registros, voltar a ler o bloco de legenda como aluno, voltar a incluir Arte e Educação Física, e tirar o `base href` da impressão. Vale repetir esse exercício quando a suíte crescer.
+
+### test-parser.mjs — 133 verificações
+
+- Sem dependência e sem rede.
 - O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
 - Cobre: nome de escola, turma pelos dois layouts, exclusão de transferidos, componentes sem prova, leitura de nota, `parseSheet` nos dois formatos de Mapão, detecção de escola, combinação de bimestres, mesclagem de lotes, status da linha, bloco de legenda e limpeza de rótulo.
 - Cobre também duas coisas que não são lógica: que `app.js` e `apps-script/app.html` não divergiram nas regras compartilhadas, e que os dois arquivos compilam.
 
-### O que o teste automatizado não alcança
+### O que o teste automatizado ainda não alcança
 
-Estes dependem de DOM, de `XLSX` e de arquivo real. Foram verificados à mão no navegador em 08/08/2026, contra as 7 turmas reais, e precisam ser refeitos assim que a leitura do Mapão mudar:
+Sobraram três, e nenhum tem solução barata:
 
-- Propagação de `Não realizou`, incluindo o cancelamento por `Esc`.
-- Mesclagem de lotes sucessivos pela tela e reimportação sem duplicar.
-- Expiração de 12 horas do `localStorage`: 11h sobrevive, 13h é descartado, lote sem `ts` é descartado.
-- ATA renderizada, brasão carregado e HTML da janela de impressão.
-- Exportação para Excel.
-- Limites de 2.000 registros, 50 arquivos e 15 MB.
-- Escapamento de HTML em nome de aluno, na tabela e na ATA.
-- `Apagar dados` zerando lista e `localStorage`.
+1. **O SheetJS de verdade.** O `test-app.mjs` usa um stub. Ler um `.xlsx` real continua sendo conferido no navegador, com o método de impressão digital descrito abaixo. Automatizar exigiria versionar uma planilha de fixture, e o `.gitignore` e o workflow bloqueiam planilha no repositório de propósito.
+2. **A cópia do Apps Script.** `apps-script/app.html` só é coberto por dois testes indiretos: as regras compartilhadas não divergiram do `app.js`, e o arquivo compila. Não há teste de ponta a ponta porque o Web App exige login Google. Manter duas cópias do mesmo parser é o risco estrutural que sobrou; vale decidir se o Web App ainda é usado.
+3. **Layout e impressão de verdade.** O `jsdom` não faz layout, então largura de coluna, quebra de página e o brasão renderizado seguem conferidos a olho.
 
 ### Método para mudanças no parser
 

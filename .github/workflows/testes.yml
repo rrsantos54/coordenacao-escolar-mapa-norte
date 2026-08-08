@@ -1,0 +1,39 @@
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Baixar código
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Rodar testes
+        run: npm test
+
+      # Planilha de aluno tem nome, turma e nota, e este repositório publica no
+      # GitHub Pages. O .gitignore já bloqueia, mas o portão fica aqui também.
+      - name: Nenhuma planilha versionada
+        run: |
+          if git ls-files | grep -iE '\.xlsx?$'; then
+            echo "Planilha versionada no repositório. Remova antes de mesclar."
+            exit 1
+          fi
+          echo "Nenhuma planilha versionada."

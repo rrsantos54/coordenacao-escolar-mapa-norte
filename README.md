@@ -12,6 +12,21 @@ python3 -m http.server 4173
 
 Abrir `http://localhost:4173`.
 
+## Testes
+
+```bash
+npm install   # só na primeira vez
+npm test
+```
+
+- `test-parser.mjs` — regras de leitura do Mapão. Sem dependência e sem rede.
+- `test-app.mjs` — comportamento da tela num DOM de verdade: subir lote, marcar
+  `Não realizou`, gerar ATA, exportar, apagar dados. Precisa do `jsdom`.
+
+Os dois rodam sozinhos em cada pull request. Nenhum depende de planilha real:
+os dados de teste são sintéticos e ficam dentro dos próprios arquivos, porque
+planilha de aluno não pode ser versionada neste repositório.
+
 ## Estado atual
 
 - Interface operacional com visão geral, recuperação, turmas e atas.
