@@ -118,12 +118,26 @@ Atualizado em 17/07/2026.
 - `test-parser.mjs` criado. Roda com `node test-parser.mjs`, sem dependência. Lê as declarações direto do `app.js` para não virar uma segunda cópia das regras. 13 casos de nome de escola, 7 de turma, 4 de `TURMA_RE`.
 - Proteção da branch `main` voltou a exigir revisão: `required_approving_review_count` 1 e `require_last_push_approval` true, com `enforce_admins` ativo. Consequência conhecida e aceita: com um único mantenedor, nenhum PR mescla e nem push direto na `main` passa. Reverter é o inverso do que está no item de 07/08.
 
+## Regras da Recuperação Semestral 2026
+
+Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 08/08/2026, baseado na Resolução SEDUC nº 42, de 5 de junho de 2024. Texto conferido por dois extratores independentes, pdf.js e `pdftotext`.
+
+- Público obrigatório: do 4º ano do Fundamental à 3ª série do Médio, quem não atingiu média igual ou superior a 5,0 em qualquer componente, no primeiro ou no segundo bimestre. É a regra que o app já aplicava.
+- Item 6.1: **Arte, Educação Física, Projeto de Vida e Redação e Leitura não participam da recuperação semestral**, porque não integram a Prova Paulista. O app passou a excluí-los; eram 49 dos 502 registros do lote real.
+- Outros componentes de itinerário e apoio — Orientação de Estudo, Práticas Experimentais, Robótica, Eletivas, Educação Financeira, Tecnologia e Inovação, Programação, Aprofundamentos, Empreendedorismo, Atualidades — também não estão na Prova Paulista pelo mesmo princípio, mas o FAQ não os nomeia. Seguem na lista, 164 registros, até a Diretoria de Ensino confirmar. Se saírem, sobram 289 dos 502.
+- `ESPORTE-MUSICA-ARTE` nunca aparece na recuperação e está certo: 339 das 356 notas são conceito (`ES`, `ET`, `EP`), não número, então nenhuma cai abaixo de 5,0.
+- Item 7.3: apenas um dos dois bimestres é alterado, o de menor desempenho. O app já trabalha assim.
+- Prova é 100% digital na Sala do Futuro. Língua Portuguesa e Matemática com 15 questões, demais componentes com 10. Cadernos separados por componente.
+- Cronograma 2026: recuperação e aprofundamento de 27/07 a 31/07; prova de 03/08 a 07/08; notas publicadas a partir de 12/08; fechamento de 13/08 a 18/08.
+
 ## Próximo retorno
 
 1. Conferir conta institucional usada no Google Apps Script. Único item que sobrou da lista anterior.
 2. Atualizar teste antigo para não considerar armazenamento artificial em `sessionStorage` como falha do aplicativo. Não há teste desse tipo no repositório; a nota existe só aqui.
 3. Publicar as correções de 08/08/2026. Nada foi mesclado ainda: a proteção da `main` voltou a exigir revisão e trava tanto PR quanto push direto enquanto houver um único mantenedor.
 4. Decidir a diferença de 2 registros e 2 alunos entre o lote consolidado e o lote por bimestre das mesmas 7 turmas, caso ela importe.
+6. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
+7. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
 5. Republicar o Apps Script: `apps-script/app.html` recebeu as mesmas correções de nome de escola e de turma, mas o brasão não foi para lá. Lá não há arquivo estático servido, então precisaria virar data URI.
 
 ## Sessão de 07/08/2026

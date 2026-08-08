@@ -18,10 +18,14 @@ const modulo = [
   grab(/^function cleanClassName\(v\).*$/m),
   grab(/^const TURMA_RE=.*$/m),
   grab(/^const TURMA_NOME_RE=.*$/m),
-  'export { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE };',
+  grab(/^const TRANSFER_RE=.*$/m),
+  grab(/^function droppedStudents\(rows\).*$/m),
+  grab(/^const SEM_PROVA_RECUPERACAO=.*$/m),
+  grab(/^function temProvaDeRecuperacao\(disciplina\).*$/m),
+  'export { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents, temProvaDeRecuperacao };',
 ].join('\n');
 
-const { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE } = await import(
+const { normalizeSchoolName, cleanClassName, TURMA_RE, TURMA_NOME_RE, droppedStudents, temProvaDeRecuperacao } = await import(
   'data:text/javascript,' + encodeURIComponent(modulo)
 );
 
@@ -86,4 +90,62 @@ assert.ok(TURMA_RE.test('1ª SERIE A'), 'TURMA_RE devia achar SERIE');
 assert.ok(TURMA_RE.test('2ª Série B'), 'TURMA_RE devia achar Série acentuado');
 assert.ok(!TURMA_RE.test('ANUAL 9H'), 'TURMA_RE não devia casar texto solto');
 
-console.log(`ok — ${escolas.length} casos de escola, ${turmas.length} de turma, 4 de TURMA_RE`);
+// --- exclusão de transferidos ---------------------------------------------
+// A situação é da linha, não do aluno.
+const cabecalho = ['ALUNO', 'SITUAÇÃO', 'MATEMATICA (1B)'];
+
+// Caso real da 1ª SÉRIE A: quatro linhas para a mesma aluna, duas de baixa e
+// duas ativas. Ela continua matriculada, então nenhuma linha dela sai.
+const lauanda = droppedStudents([
+  cabecalho,
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Baixa - Transferência', ''],
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Baixa - Transferência', '4'],
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Ativo', '3'],
+  ['LAUANDA SUELI FELIPE DE BRITO', 'Ativo', '3'],
+]);
+assert.equal(lauanda.size, 0, 'aluna com linha ativa não pode ser excluída');
+
+// Aluno só com linha de transferência continua fora da lista.
+const so_transferido = droppedStudents([
+  cabecalho,
+  ['ANTONIO CARLOS SOUSA DA SILVA', 'Transferido', '2'],
+  ['OUTRO ALUNO ATIVO', 'Ativo', '3'],
+]);
+assert.ok(so_transferido.has('ANTONIO CARLOS SOUSA DA SILVA'), 'transferido puro sai');
+assert.ok(!so_transferido.has('OUTRO ALUNO ATIVO'), 'ativo fica');
+assert.equal(so_transferido.size, 1);
+
+// As outras marcas de saída que o Mapão usa.
+for (const marca of ['Transferida', 'Transferência', 'Baixa de transferência', 'Matrícula baixada']) {
+  const saiu = droppedStudents([cabecalho, ['FULANO DE TAL', marca, '2']]);
+  assert.ok(saiu.has('FULANO DE TAL'), `marca não reconhecida: ${marca}`);
+}
+
+// Linha sem nome não vira chave, e acento não muda o resultado.
+const comAcento = droppedStudents([cabecalho, ['', 'Transferido', ''], ['JOÃO DA SILVA', 'Transferido', '2']]);
+assert.ok(comAcento.has('JOAO DA SILVA'), 'chave é comparada sem acento');
+assert.equal(comAcento.size, 1);
+
+// --- componentes sem prova de recuperação ---------------------------------
+// FAQ da Recuperação Semestral 2026, item 6.1.
+const semProva = ['ARTE', 'Arte', 'EDUCACAO FISICA', 'Educação Física', 'PROJETO DE VIDA', 'REDAÇAO E LEITURA', 'Redação e Leitura'];
+for (const d of semProva) {
+  assert.equal(temProvaDeRecuperacao(d), false, `devia ficar fora: ${d}`);
+}
+
+// Os componentes da Prova Paulista continuam entrando.
+const comProva = ['MATEMATICA', 'LINGUA PORTUGUESA', 'HISTORIA', 'GEOGRAFIA', 'CIENCIAS', 'BIOLOGIA', 'FISICA', 'QUIMICA', 'FILOSOFIA', 'SOCIOLOGIA', 'LINGUA INGLESA'];
+for (const d of comProva) {
+  assert.equal(temProvaDeRecuperacao(d), true, `devia entrar: ${d}`);
+}
+
+// ESPORTE-MUSICA-ARTE termina em ARTE e não pode ser pego pela exclusão.
+assert.equal(temProvaDeRecuperacao('ESPORTE-MUSICA-ARTE'), true, 'comparação é exata, não por trecho');
+
+// Componentes de itinerário seguem na lista até a Diretoria de Ensino confirmar.
+for (const d of ['ORIENTAÇAO DE ESTUDO - MATEMATICA', 'PRATICAS EXPERIMENTAIS', 'ROBOTICA', 'ELETIVAS']) {
+  assert.equal(temProvaDeRecuperacao(d), true, `ainda não é para excluir: ${d}`);
+}
+
+const totalSemProva = semProva.length + comProva.length + 1 + 4;
+console.log(`ok — ${escolas.length} casos de escola, ${turmas.length} de turma, 4 de TURMA_RE, 9 de droppedStudents, ${totalSemProva} de temProvaDeRecuperacao`);
