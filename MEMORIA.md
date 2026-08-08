@@ -83,15 +83,48 @@ Atualizado em 17/07/2026.
 - Só `Cmd+Shift+R` traz a versão nova. Verificar com `validateRecoveryScore.toString()` no console se há dúvida sobre qual versão está rodando.
 - Esse é o mesmo tipo de engano que motivou toda a investigação de 07/08/2026, quando uma cópia local defasada parecia ser a versão publicada.
 
+## Sessão de 08/08/2026
+
+- Validação com Mapão real concluída. Os itens 1, 3, 5 e 7 do "Próximo retorno" saíram da lista.
+- Correção do item 5: `normalizeSchoolName` move o título honorífico do fim para a frente, abreviado. `Waldomiro Sampaio de Souza Prefeito` vira `PREF. WALDOMIRO SAMPAIO DE SOUZA`. Aplicada nos dois pontos de detecção — nome do arquivo e metadado do Mapão — e nas duas cópias, `app.js` e `apps-script/app.html`.
+- A caixa alta preserva acento. `normal()` entra só na chave de busca do título, porque remove acento e transformaria `JOÃO` em `JOAO` no cabeçalho da ATA. O teste pegou isso.
+- O item 3 estava descrito errado: não existe geração de DOCX no código. A ATA sai por `Imprimir / PDF` (`printAta`) e há `Exportar Excel` (`exportRecovery`). Foi isso que se validou.
+- Homônimo em outra turma não é testável com lote real: os 93 alunos do lote por bimestre não têm nome repetido. Esse caso segue coberto só por dado sintético.
+
+### Mapão consolidado
+
+- Layout diferente do Mapão por bimestre: cabeçalho na linha 0, colunas `DISCIPLINA (1B)` e `DISCIPLINA (2B)` no mesmo arquivo, coluna `SITUAÇÃO`, e nenhuma linha de metadado acima.
+- Não traz turma nem escola dentro da planilha. A turma só existe no nome do arquivo.
+- Defeito encontrado e corrigido: `findTurma` só conhecia `ANO`, e o char class do ordinal não tinha `ª`. As três turmas de ensino médio (`1ª/2ª/3ª SERIE`) caíam em `Turma não identificada` — 188 dos 485 registros. Agora `TURMA_RE` e `TURMA_NOME_RE` aceitam `ANO` e `SÉRIE/SERIE` com `º`, `°` ou `ª`.
+- `TURMA_NOME_RE` não atravessa `_` de propósito. Em nome tipo `..._7º_ANO_A_...` casaria só `7º ANO` e perderia o `A`, juntando turmas diferentes do mesmo ano numa ATA só. Esses arquivos trazem a turma dentro da planilha, então o nome nem é consultado.
+- O campo Nome da escola fica vazio com lote consolidado. Não é defeito: o dado não existe no arquivo. `renderAta` só troca o cabeçalho quando `schoolName` tem valor, então a ATA cai no texto padrão do `index.html`, que já é o desta escola. Para outra escola, digitar no campo.
+- Lote consolidado deu 485 registros e 95 alunos, contra 483 e 93 do lote por bimestre das mesmas 7 turmas. Diferença de 2 registros e 2 alunos não investigada — os dois lotes foram gerados em momentos diferentes.
+
+### Brasão na ATA
+
+- `brasao-sp.png` adicionado, 250x291, 136 KB, exibido a 58 px na tela e 70 px na impressão.
+- Origem: Wikimedia Commons, `File:Brasão do estado de São Paulo.svg`, domínio público, creditado ao Manual de Identidade Visual do Governo de SP. Baixado como PNG pelo `Special:FilePath` com `width=240`.
+- O arquivo `brasao sp.jpeg` que estava na pasta é foto de banco de imagem com marca d'água do iStock e legenda "São Paulo (state)". Não foi usado nem versionado. Pode apagar.
+- O `<img class="brasao">` fica fora do `.paper-center` porque `renderAta` reescreve o `innerHTML` desse bloco e apagaria a imagem.
+- Posição: à esquerda, alinhado verticalmente ao centro do bloco de texto, dentro de `.paper-head` com `display:flex`. Não fica centralizado no topo.
+- O wrapper `.paper-head` quebrou o seletor `p:nth-of-type(2)` que o `renderAta` usava para achar o parágrafo de abertura — passou a retornar null. O parágrafo ganhou a classe `.paper-intro` e o seletor deixou de depender de posição. A cópia do Apps Script não tem o wrapper e segue com o seletor antigo, que lá continua correto.
+- `printAta` ganhou `<base href>`: a janela de impressão é `about:blank`, onde `src="brasao-sp.png"` relativo não resolve.
+
+### Outros ajustes
+
+- `.paper-table` no `styles.css` tinha 4 colunas e a geração produz 6. Corrigido para 6.
+- Cabeçalho de `renderAta` voltou a ter `- SAGRES`, como no texto padrão do `index.html`.
+- `.gitignore` agora bloqueia `*.xlsx`, `*.xls` e `.playwright-mcp/`. As planilhas de aluno na pasta do projeto não podem ser versionadas: este repositório publica no GitHub Pages. Histórico conferido, nenhuma planilha foi commitada em momento algum.
+- `test-parser.mjs` criado. Roda com `node test-parser.mjs`, sem dependência. Lê as declarações direto do `app.js` para não virar uma segunda cópia das regras. 13 casos de nome de escola, 7 de turma, 4 de `TURMA_RE`.
+- Proteção da branch `main` voltou a exigir revisão: `required_approving_review_count` 1 e `require_last_push_approval` true, com `enforce_admins` ativo. Consequência conhecida e aceita: com um único mantenedor, nenhum PR mescla e nem push direto na `main` passa. Reverter é o inverso do que está no item de 07/08.
+
 ## Próximo retorno
 
-1. Validar ATA com planilhas reais da Sala do Futuro.
-2. Conferir conta institucional usada no Google Apps Script.
-3. Testar geração final de DOCX com duas notas de recuperação quando aluno tiver pendência nos dois bimestres.
-4. Atualizar teste antigo para não considerar armazenamento artificial em `sessionStorage` como falha do aplicativo.
-5. Corrigir a ordem do nome da escola extraído do Mapão. Em 07/08/2026, com lote real, saiu `Waldomiro Sampaio de Souza Prefeito`; o correto é `PREF. WALDOMIRO SAMPAIO DE SOUZA`. O campo é editável na tela, então não bloqueia o uso, mas sai invertido no cabeçalho da ATA.
-6. Decidir se a proteção da branch `main` volta a exigir revisão. Hoje `required_approving_review_count` é 0 e `require_last_push_approval` é false.
-7. Conferir a ATA gerada a partir de lote real com aluno marcado como `Não realizou`. A lógica está verificada com dados sintéticos; o encaixe com planilha de verdade, não.
+1. Conferir conta institucional usada no Google Apps Script. Único item que sobrou da lista anterior.
+2. Atualizar teste antigo para não considerar armazenamento artificial em `sessionStorage` como falha do aplicativo. Não há teste desse tipo no repositório; a nota existe só aqui.
+3. Publicar as correções de 08/08/2026. Nada foi mesclado ainda: a proteção da `main` voltou a exigir revisão e trava tanto PR quanto push direto enquanto houver um único mantenedor.
+4. Decidir a diferença de 2 registros e 2 alunos entre o lote consolidado e o lote por bimestre das mesmas 7 turmas, caso ela importe.
+5. Republicar o Apps Script: `apps-script/app.html` recebeu as mesmas correções de nome de escola e de turma, mas o brasão não foi para lá. Lá não há arquivo estático servido, então precisaria virar data URI.
 
 ## Sessão de 07/08/2026
 
