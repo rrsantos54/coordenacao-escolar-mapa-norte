@@ -104,5 +104,9 @@ document.addEventListener('change',event=>{if(event.target.id!=='folder-input')r
 document.addEventListener('change',event=>{if(event.target.id!=='folder-input')return;const fileName=[...event.target.files].map(file=>file.name).find(name=>/E\.?E\.?|ESCOLA|UNIDADE/i.test(name));if(fileName){const detected=fileName.replace(/\.(xlsx|xls)$/i,'').replace(/[_-]+/g,' ').replace(/\b(1|2)\s*[º°]?\s*BIMESTRE.*$/i,'').trim();if(detected.length>=4){schoolName=normalizeSchoolName(detected);$('#school-name').value=schoolName;toast(`Escola identificada: ${schoolName}`)}}},true);
 document.addEventListener('change',event=>{if(event.target.matches('.score-input,.replacement-select'))persistBatch()});
 $('#school-name').addEventListener('input',event=>{schoolName=event.target.value.trim();renderMinutes()});
+// Normaliza ao sair do campo, não a cada tecla, para não brigar com quem digita.
+// Com o Mapão consolidado a escola não vem na planilha, então digitar é o
+// caminho normal — e sem isto o nome vai cru para a ATA, com o título no fim.
+$('#school-name').addEventListener('change',event=>{const nome=normalizeSchoolName(event.target.value);if(nome===schoolName)return;schoolName=nome;event.target.value=nome;renderMinutes();persistLocal()});
 $('#refresh-page').onclick=()=>{persistLocal();location.reload()};
 $('#folder-input').onchange=async e=>{if(!e.target.files.length)return;toast('Lendo planilhas…');const results=await Promise.allSettled([...e.target.files].map(extractWorkbook));const parsed=results.filter(result=>result.status==='fulfilled').map(result=>result.value);const failed=results.filter(result=>result.status==='rejected');failed.forEach(result=>console.error(result.reason));if(parsed.length)importBatch(parsed);if(failed.length)toast(`${parsed.length} arquivos processados; ${failed.length} ignorados por erro.`)};
