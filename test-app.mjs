@@ -338,7 +338,33 @@ function montarApp() {
   eq(campo.value, 'PREF. WALDOMIRO SAMPAIO DE SOUZA', 'normalizar duas vezes não altera');
 }
 
-// ============================ 13. o uso normal não escreve nada no console
+// ================== 13. SheetJS bloqueado avisa a causa certa
+// O leitor de planilha vem de CDN e rede de escola às vezes bloqueia. A
+// mensagem antiga era "arquivos ignorados por erro", que culpa a planilha.
+{
+  const { window, doc, app, subirLote } = montarApp();
+  const real = window.XLSX;
+  delete window.XLSX;
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  const aviso = doc.querySelector('#toast').textContent;
+  ok(aviso.includes('não carregou'), `devia culpar a conexão, veio: ${aviso}`);
+  ok(!aviso.includes('ignorados por erro'), 'não pode culpar a planilha de quem usa');
+  eq(app.recoveryData.length, 0, 'e nada é importado');
+  window.XLSX = real;
+}
+
+// ============================== 14. a data do topo é a de hoje
+// Era fixa no HTML e envelhecia sozinha.
+{
+  const { doc } = montarApp();
+  const texto = doc.querySelector('#hoje').textContent;
+  const agora = new Date();
+  const esperado = agora.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(/ de /g, ' ');
+  eq(texto, esperado.charAt(0).toUpperCase() + esperado.slice(1), 'a data do topo é gerada, não escrita à mão');
+  ok(!texto.includes('16 julho 2026'), 'não sobrou a data fixa do HTML');
+}
+
+// ============================ 15. o uso normal não escreve nada no console
 // Erro ou aviso inesperado no console é sintoma; aqui vira falha de teste.
 {
   const { doc, app, subirLote, errosDeConsole } = montarApp();
