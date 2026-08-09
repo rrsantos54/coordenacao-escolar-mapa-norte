@@ -109,4 +109,11 @@ $('#school-name').addEventListener('input',event=>{schoolName=event.target.value
 // caminho normal — e sem isto o nome vai cru para a ATA, com o título no fim.
 $('#school-name').addEventListener('change',event=>{const nome=normalizeSchoolName(event.target.value);if(nome===schoolName)return;schoolName=nome;event.target.value=nome;renderMinutes();persistLocal()});
 $('#refresh-page').onclick=()=>{persistLocal();location.reload()};
-$('#folder-input').onchange=async e=>{if(!e.target.files.length)return;toast('Lendo planilhas…');const results=await Promise.allSettled([...e.target.files].map(extractWorkbook));const parsed=results.filter(result=>result.status==='fulfilled').map(result=>result.value);const failed=results.filter(result=>result.status==='rejected');failed.forEach(result=>console.error(result.reason));if(parsed.length)importBatch(parsed);if(failed.length)toast(`${parsed.length} arquivos processados; ${failed.length} ignorados por erro.`)};
+// A data do topo era fixa no HTML e envelhecia sozinha: quem abrisse o link via
+// a data de quando a página foi escrita.
+function hojePorExtenso(agora=new Date()){const texto=agora.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).replace(/ de /g,' ');return texto.charAt(0).toUpperCase()+texto.slice(1)}
+if($('#hoje'))$('#hoje').textContent=hojePorExtenso();
+// O SheetJS vem de cdn.sheetjs.com. Rede de escola às vezes bloqueia CDN, e sem
+// esta checagem o erro saía como "arquivos ignorados por erro", que culpa a
+// planilha de quem está usando em vez da rede.
+$('#folder-input').onchange=async e=>{if(!e.target.files.length)return;if(!window.XLSX){toast('Leitor de planilha não carregou. Verifique a conexão e recarregue a página.');e.target.value='';return}toast('Lendo planilhas…');const results=await Promise.allSettled([...e.target.files].map(extractWorkbook));const parsed=results.filter(result=>result.status==='fulfilled').map(result=>result.value);const failed=results.filter(result=>result.status==='rejected');failed.forEach(result=>console.error(result.reason));if(parsed.length)importBatch(parsed);if(failed.length)toast(`${parsed.length} arquivos processados; ${failed.length} ignorados por erro.`)};
