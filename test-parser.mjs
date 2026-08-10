@@ -40,7 +40,14 @@ const PUROS = [
   /^function notaBimestre\(v\).*$/m,
   /^function notaRecuperacao\(v\).*$/m,
   /^function bimestreSubstituido\(v\).*$/m,
+  /^function linhaValidada\(aluno,turma,disciplina,nota1,nota2,recuperacaoBruta,bimestreBruto\).*$/m,
   /^function parseExport\(rows\).*$/m,
+  /^function chaveDaLinha\(row\).*$/m,
+  /^function linhasParaSala\(rows\).*$/m,
+  /^function linhasDaSala\(linhas\).*$/m,
+  /^function salaDaUrl\(hash\).*$/m,
+  /^const SALA_ALFABETO=.*$/m,
+  /^function novaSala\(sorteio=.*$/m,
 ];
 
 const EXPORTA = [
@@ -48,6 +55,7 @@ const EXPORTA = [
   'droppedStudents', 'temProvaDeRecuperacao', 'parseSheet', 'detectSchool',
   'keepRecords', 'combineRecords', 'mergeRows', 'bimester', 'parseNumber', 'rowStatus',
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
+  'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -57,6 +65,7 @@ const {
   droppedStudents, temProvaDeRecuperacao, parseSheet, detectSchool,
   keepRecords, combineRecords, mergeRows, bimester, parseNumber, rowStatus,
   parseExport, notaRecuperacao, bimestreSubstituido,
+  chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
 } = api;
 
 let checks = 0;
@@ -356,6 +365,43 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ok(juntas.every(r => r[7] === 'Concluído'), 'as duas linhas ficam concluídas');
 }
 
+// ------------------------------------------------- ida e volta da sala
+// A sala é o link que duas pessoas abrem para lançar nota ao mesmo tempo. O
+// Apps Script do outro lado é caixa burra: compara string com string. Toda a
+// identidade do aluno é decidida aqui, e por isso a chave viaja pronta.
+{
+  const linha = ['Fulana de Tal', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído'];
+
+  eq(chaveDaLinha(linha), 'FULANA DE TAL|6º ANO A|MATEMATICA', 'a chave é o trio normalizado');
+  // Acento e caixa não podem gerar duas linhas para o mesmo aluno no servidor.
+  eq(chaveDaLinha(['fulana de tal', '6º ano a', 'matemática']), chaveDaLinha(['FULANA DE TAL', '6º ANO A', 'MATEMÁTICA']), 'acento e caixa dão a mesma chave');
+
+  const enviadas = linhasParaSala([linha]);
+  eq(enviadas[0].length, 8, 'vai a chave mais sete colunas');
+  eq(enviadas[0][0], chaveDaLinha(linha), 'a chave vai na frente');
+  ok(!enviadas[0].includes('Concluído'), 'o status não viaja: é recalculado de cada lado');
+
+  // Volta do servidor é entrada de fora, como a planilha devolvida.
+  eq(linhasDaSala(enviadas)[0], linha, 'a linha volta inteira, com o status recalculado');
+  eq(linhasDaSala([['k', 'Aluno', 'T', 'D', 'x', '', '99', 'chute', 'Concluído']])[0].slice(3), ['—', '—', '—', '', 'Pendente'], 'lixo vindo da rede é recusado igual ao da planilha');
+  eq(linhasDaSala(null), [], 'resposta sem linhas não quebra');
+  eq(linhasDaSala([['k', '', '', '']]), [], 'linha sem aluno é descartada');
+
+  // O código da sala é o único segredo, porque a implantação é aberta.
+  eq(salaDaUrl('#sala=ABCD2345EFGH'), 'ABCD2345EFGH', 'o código sai do hash');
+  eq(salaDaUrl('#sala=abcd2345efgh'), 'ABCD2345EFGH', 'e sobe para caixa alta');
+  eq(salaDaUrl('#sala=CURTO'), '', 'código curto demais é ignorado');
+  eq(salaDaUrl(''), '', 'sem hash não há sala');
+  eq(salaDaUrl('#outra=coisa'), '', 'hash de outra coisa não vira sala');
+
+  const codigo = novaSala(n => new Uint8Array(n).fill(0));
+  eq(codigo.length, 12, 'o código tem 12 caracteres');
+  ok(/^[A-Z0-9]{12}$/.test(codigo), 'só letras e dígitos, para caber no hash e no Apps Script');
+  ok(!/[IO01]/.test(SALA_ALFABETO), 'sem I, O, 0 e 1: são os que se confundem ao ditar');
+  // Sorteio diferente tem que dar código diferente, senão o segredo não existe.
+  ok(novaSala(n => new Uint8Array(n).fill(0)) !== novaSala(n => new Uint8Array(n).fill(7)), 'bytes diferentes geram códigos diferentes');
+}
+
 // --------------------------------------------------------- o app.js compila
 // Envolver em função declara sem executar: erro de sintaxe estoura no import,
 // mas nenhuma linha que toca DOM chega a rodar.
@@ -371,12 +417,36 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 // --------------------------------------------- não pode voltar a existir cópia
 // O parser já morou em dois lugares, app.js e apps-script/app.html, e uma
 // correção chegou a entrar só num lado. O Apps Script foi aposentado em
-// 08/08/2026 justamente para acabar com essa classe de defeito. Se um segundo
-// parser aparecer no repositório, este teste avisa.
+// 08/08/2026 justamente para acabar com essa classe de defeito.
+//
+// Em 10/08/2026 o apps-script/ voltou, mas como caixa de dados: guarda linhas e
+// devolve linhas, sem conhecer Mapão, nota baixa nem aluno transferido. A
+// guarda deixou de ser "a pasta não existe" e passou a ser "a pasta não tem
+// parser" — que é o defeito de verdade, e o que precisa continuar impossível.
 {
-  const { readdirSync } = await import('node:fs');
-  const raiz = readdirSync(new URL('.', import.meta.url));
-  ok(!raiz.includes('apps-script'), 'apps-script voltou ao repositório: existe um segundo parser para manter em dia');
+  const { readdirSync, readFileSync: lerArquivo } = await import('node:fs');
+  const pasta = new URL('./apps-script/', import.meta.url);
+  let arquivos = [];
+  try { arquivos = readdirSync(pasta); } catch (e) { arquivos = []; }
+
+  // Marcas de parser: se qualquer uma aparecer no Apps Script, a regra passou a
+  // existir em dois lugares de novo.
+  const PROIBIDO = [
+    [/\bALUNO\b/, 'procura o cabeçalho ALUNO'],
+    [/parseSheet|combineRecords|keepRecords|droppedStudents/, 'copiou função do parser'],
+    [/TRANSFERID|BAIXA\s+DE\s+TRANSFER/i, 'sabe o que é aluno transferido'],
+    [/SEM_PROVA_RECUPERACAO|EDUCACAO FISICA|PROJETO DE VIDA/i, 'sabe quais componentes ficam fora'],
+    [/[ºª°]\s*BIM|PRIMEIRO BIMESTRE|SEGUNDO BIMESTRE/i, 'sabe o que é bimestre'],
+    [/<\s*5|nota\s*<|abaixo de 5/i, 'conhece o corte de nota 5,0'],
+  ];
+  for (const nome of arquivos) {
+    const conteudo = lerArquivo(new URL(nome, pasta), 'utf8');
+    // O cabeçalho do próprio arquivo explica a regra; a checagem é do código.
+    const codigo = conteudo.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+    for (const [marca, porque] of PROIBIDO) {
+      ok(!marca.test(codigo), `apps-script/${nome} ${porque}: o parser voltou a existir em dois lugares`);
+    }
+  }
 }
 
 console.log(`ok — ${checks} verificações`);

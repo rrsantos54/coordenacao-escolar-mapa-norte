@@ -42,13 +42,40 @@ planilha de aluno não pode ser versionada neste repositório.
   botão `Apagar dados`.
 - Exportação para Excel e ATA por turma em `Imprimir / PDF`.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
+- Sala compartilhada por link, quando ligada: duas pessoas lançam nota juntas.
 - Mantém arquivos originais intactos.
 
-## Trabalho em dupla
+## Trabalho em dupla — sala compartilhada
 
-O app não tem servidor: o lote vive no navegador de quem importou, e mandar o
-link não compartilha dado nenhum. Para duas pessoas lançarem nota ao mesmo
-tempo, o transporte é uma planilha compartilhada:
+Quem importa o Mapão abre uma sala e recebe um link. Quem abrir esse link vê a
+mesma lista e digita nota junto, e cada nota aparece na tela do outro em alguns
+segundos. Não precisa instalar nada nem baixar planilha.
+
+A sala só existe se `SALA_ENDPOINT`, no `app.js`, apontar para uma implantação
+do Apps Script — veja abaixo. Com o campo vazio, que é como o repositório vem, o
+app funciona exatamente como antes, inteiro dentro do navegador.
+
+**O código da sala é o único segredo.** A implantação é aberta a qualquer um,
+porque não há login. Quem tiver o link entra e edita. Trate o link como se fosse
+a própria lista de notas: mande direto para quem vai ajudar, não jogue em grupo.
+
+### Ligar a sala, uma vez por escola
+
+1. Em `script.google.com`, crie um projeto e cole o `apps-script/Code.gs`.
+2. Em Configurações, marque mostrar o manifesto, e cole o `appsscript.json`.
+3. Implantar → Nova implantação → Web app, executando como você e com acesso
+   para qualquer pessoa. Autorize na primeira execução.
+4. Copie a URL terminada em `/exec` para `SALA_ENDPOINT`, no topo do `app.js`.
+5. Publique. A planilha `Mapa Norte — Salas` nasce sozinha no seu Drive, no
+   primeiro lote salvo, e é onde o dado de aluno fica.
+
+Ao atualizar o Apps Script depois, use Gerenciar implantações e edite a que já
+existe. Criar outra gera uma URL nova e a sala antiga fica órfã.
+
+## Trabalho em dupla — planilha compartilhada
+
+Alternativa sem servidor, e o que fazer quando a sala estiver fora do ar. O lote
+vive no navegador de quem importou, então o transporte é o arquivo:
 
 1. Importe os Mapões e clique `Exportar Excel`.
 2. Suba o arquivo no Drive da escola e compartilhe com quem vai ajudar.
