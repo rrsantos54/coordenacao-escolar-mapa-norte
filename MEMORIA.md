@@ -144,11 +144,11 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 ## Como o app é testado
 
-`npm test` roda os dois arquivos e soma 299 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
+`npm test` roda os dois arquivos e soma 322 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
 
-Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 177 e `test-app.mjs` imprime 122. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
+Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 189 e `test-app.mjs` imprime 133. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
 
-### test-app.mjs — 122 verificações de comportamento
+### test-app.mjs — 133 verificações de comportamento
 
 - Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
 - Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
@@ -164,7 +164,7 @@ Repetido em 10/08/2026 sobre a sala compartilhada, com sete mutantes. Cinco morr
 
 Repetido em 10/08/2026 sobre a reimportação da planilha exportada, com cinco mutantes, todos mortos: `extractWorkbook` deixar de reconhecer a exportação, copiar o status escrito no arquivo em vez de recalcular, `showImported` ignorar um lote só de planilha preenchida, aceitar qualquer texto como nota de recuperação, e deixar o `Não realizou` voltar a carregar bimestre.
 
-### test-parser.mjs — 177 verificações
+### test-parser.mjs — 189 verificações
 
 - Sem dependência e sem rede.
 - O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
@@ -301,13 +301,29 @@ O `test-parser.mjs` lê essas declarações do fonte e reprova se o `integrity`,
 
 `baixarAtaWord` precisa saber qual ATA está na tela. O `.minute-row.selected` do HTML não serve: `renderMinutes` marca sempre a primeira da lista e o clique em `Revisar ATA` nunca movia essa marca. Agora `renderAta` guarda a turma em `ataAtual`, e o clique move o destaque — o que também corrige a lista, que mostrava a turma errada em destaque desde sempre.
 
+### Correções depois do primeiro uso — 10/08/2026
+
+A primeira ATA gerada mostrou dois defeitos, os dois corrigidos no mesmo dia.
+
+**O brasão e o bloco do governo estavam no corpo, não no cabeçalho de página.** Consequência: some da página 2 em diante, e turma grande passa de uma página. Agora a seção tem `headers: {default: new Header(...)}`, e o corpo começa no título. Conferido contra a biblioteca real: o `.docx` passou a ter a parte `word/header1.xml`, e a imagem em `word/media/` está dentro dela.
+
+**As disciplinas vinham sem acento**, e de forma inconsistente — o Mapão manda `ORIENTAÇAO DE ESTUDO - MATEMATICA`, com cedilha e sem til. ATA é documento oficial. `DISCIPLINAS_ACENTUADAS` mapeia a forma sem acento para a grafia correta, e `acentuarDisciplina` entra dentro do `cleanSubject`, então a correção vale em tudo: tela, Excel, ATA impressa e Word.
+
+Três cuidados nessa tabela:
+
+- A chave é a forma **sem** acento, porque é essa que chega do Mapão.
+- Componente composto é tratado lado a lado, e o separador volta como veio: `ESPORTE-MUSICA-ARTE` não tem espaço em volta do hífen, e inventar espaço mudaria o nome do componente.
+- Componente fora da lista passa intacto. A tabela corrige o que se sabe, não chuta.
+
+Isso **não** parte a mesclagem: a chave de merge e a chave da sala passam por `normal()`, que ignora acento, então `MATEMATICA` do Mapão e `MATEMÁTICA` corrigida continuam sendo a mesma linha.
+
 ### Verificação
 
 O `test-app.mjs` substitui o `docx` por um dublê que guarda tipo e opções de cada objeto, e o teste pergunta se o texto esperado está no documento. Isso cobre a composição, não o formato.
 
 O formato foi conferido no navegador, em 10/08/2026, contra a biblioteca de verdade servida por `python3 -m http.server`: o blob sai com o MIME do OOXML, começa com `PK` — é zip —, tem 86.453 bytes com brasão e 9.240 sem, o que prova que a imagem entra mesmo. Nenhuma exceção, então a API está usada certo. É o mesmo método de fronteira do SheetJS: o dublê cobre a lógica, o navegador cobre a biblioteca.
 
-Dez mutantes, dez mortos. Dois só morreram depois de o teste ficar mais forte: incluir aluno de outra turma na ATA sobrevivia porque o teste subia um lote de turma única, e ignorar o `ataAtual` sobrevivia porque o teste só baixava a ATA da primeira turma.
+Quinze mutantes ao todo, quinze mortos. Quatro só morreram depois de o teste ficar mais forte: incluir aluno de outra turma na ATA sobrevivia porque o teste subia um lote de turma única; ignorar o `ataAtual` sobrevivia porque o teste só baixava a ATA da primeira turma; e colar as células da ATA da tela sobrevivia porque nada conferia que cada célula era um elemento próprio — lacuna que já existia antes deste trabalho e apareceu por acaso, quando um padrão de mutação casou com `ataRows` em vez da função que eu queria atingir.
 
 ## Arquitetura do app.js
 

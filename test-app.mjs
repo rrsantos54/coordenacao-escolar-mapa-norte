@@ -125,7 +125,7 @@ function montarApp(opcoes = {}) {
   const criarClasse = (tipo) => class { constructor(opcoes) { this.tipo = tipo; this.opcoes = opcoes; } };
   const baixados = [];
   window.docx = {
-    Document: criarClasse('Document'), Paragraph: criarClasse('Paragraph'), TextRun: criarClasse('TextRun'),
+    Document: criarClasse('Document'), Header: criarClasse('Header'), Paragraph: criarClasse('Paragraph'), TextRun: criarClasse('TextRun'),
     Table: criarClasse('Table'), TableRow: criarClasse('TableRow'), TableCell: criarClasse('TableCell'),
     ImageRun: criarClasse('ImageRun'),
     AlignmentType: { CENTER: 'center' }, WidthType: { PERCENTAGE: 'pct' }, BorderStyle: { NONE: 'none' },
@@ -199,7 +199,7 @@ function montarApp(opcoes = {}) {
   eq([...new Set(linhas.map(r => r[1]))], [TURMA_A_NOME], 'turma do nome do arquivo');
   ok(!linhas.some(r => r[0] === 'ALUNO TRANSFERIDO'), 'transferido fica fora');
   ok(!linhas.some(r => r[0] === 'ALUNA SEM PENDENCIA'), 'quem não tem nota baixa fica fora');
-  const mat = linhas.find(r => r[0] === 'ALUNA COM TRES PENDENCIAS' && r[2] === 'MATEMATICA');
+  const mat = linhas.find(r => r[0] === 'ALUNA COM TRES PENDENCIAS' && r[2] === 'MATEMÁTICA');
   eq([mat[3], mat[4], mat[6]], ['3', '4', '1º bimestre'], 'dois bimestres e o menor sugerido');
 }
 
@@ -256,13 +256,13 @@ function montarApp(opcoes = {}) {
   const depoisDoPrimeiro = app.recoveryData.length;
 
   // A coordenação lança uma nota à mão antes do segundo lote chegar.
-  const alvo = app.recoveryData.find(r => r[2] === 'HISTORIA');
+  const alvo = app.recoveryData.find(r => r[2] === 'HISTÓRIA');
   alvo[5] = '7'; alvo[6] = '1º bimestre'; alvo[7] = 'Concluído';
 
   await subirLote([[ARQUIVO_B, TURMA_B]]);
   eq(app.recoveryData.length, depoisDoPrimeiro + 1, 'o segundo lote acrescenta');
   eq([...new Set(app.recoveryData.map(r => r[1]))].length, 2, 'duas turmas na tela');
-  const depois = app.recoveryData.find(r => r[2] === 'HISTORIA');
+  const depois = app.recoveryData.find(r => r[2] === 'HISTÓRIA');
   eq(depois[5], '7', 'nota lançada à mão sobrevive ao segundo lote');
 
   // Reimportar o mesmo arquivo não pode duplicar linha.
@@ -309,6 +309,11 @@ function montarApp(opcoes = {}) {
   const paper = doc.querySelector('.paper');
   const celulas = [...paper.querySelectorAll('.paper-table span')].map(s => s.textContent);
   eq((celulas.length - 6) / 6, 4, 'a ATA tem uma linha por pendência');
+  // A grade é montada por concatenação de <span>. Se algo entrar entre eles, a
+  // célula deixa de ser uma célula e o texto vaza para a coluna do lado.
+  eq(paper.querySelector('.paper-table').textContent, celulas.join(''), 'a grade não tem texto solto entre as células');
+  eq(celulas.slice(0, 6), ['Aluno', 'Disciplina', 'Nota do primeiro bimestre', 'Nota do segundo bimestre', 'Nota da recuperação semestral', 'Bimestre substituído'], 'com o cabeçalho na ordem certa');
+  ok(celulas.includes('MATEMÁTICA'), 'e a disciplina acentuada como célula própria');
   ok(paper.querySelector('img.brasao'), 'o brasão está na ATA');
   ok(paper.querySelector('.paper-head'), 'dentro do cabeçalho em linha');
   ok(paper.querySelector('.paper-center').textContent.includes('E.E.'), 'o cabeçalho traz a unidade');
@@ -494,14 +499,27 @@ function montarApp(opcoes = {}) {
   ok(texto.includes('ATA DE RECUPERAÇÃO SEMESTRAL — 2026'), 'o título entra no documento');
   ok(texto.includes(TURMA_A_NOME), 'a turma entra no parágrafo de abertura');
   ok(texto.includes('ALUNA COM TRES PENDENCIAS'), 'os alunos entram na tabela');
-  ok(texto.includes('MATEMATICA'), 'com as disciplinas');
+  ok(texto.includes('MATEMÁTICA'), 'com as disciplinas');
   ok(texto.includes('Coordenação') && texto.includes('Direção'), 'e as assinaturas');
   ok(!texto.includes('ALUNO TRANSFERIDO'), 'quem está fora da lista continua fora da ATA');
   ok(!texto.includes('ALUNA DA OUTRA TURMA'), 'e aluno de outra turma não entra na ATA desta');
 
-  // A ATA em Word tem que ser o mesmo documento da tela, não uma versão pobre.
-  const paragrafos = JSON.stringify(baixados[0].doc).match(/"tipo":"ImageRun"/g) || [];
-  eq(paragrafos.length, 1, 'o brasão entra como imagem');
+  // O brasão e o bloco do governo vão no cabeçalho de página, não no corpo:
+  // é assim que se repetem na página 2 em diante, e turma grande passa de uma.
+  const secao = baixados[0].doc.opcoes.sections[0];
+  eq(secao.headers.default.tipo, 'Header', 'a seção tem cabeçalho de página');
+  const noCabecalho = JSON.stringify(secao.headers.default);
+  const noCorpo = JSON.stringify(secao.children);
+  ok(noCabecalho.includes('GOVERNO DO ESTADO DE SÃO PAULO'), 'o bloco do governo está no cabeçalho');
+  ok(!noCorpo.includes('GOVERNO DO ESTADO DE SÃO PAULO'), 'e não no corpo, onde só apareceria na primeira página');
+  ok(noCabecalho.includes('PREF. WALDOMIRO SAMPAIO DE SOUZA'), 'com a escola');
+  eq((noCabecalho.match(/"tipo":"ImageRun"/g) || []).length, 1, 'o brasão entra como imagem no cabeçalho');
+  eq((noCorpo.match(/"tipo":"ImageRun"/g) || []).length, 0, 'e não sobra cópia no corpo');
+  ok(noCorpo.includes('ATA DE RECUPERAÇÃO SEMESTRAL'), 'o título continua no corpo');
+
+  // As disciplinas saem acentuadas mesmo vindo sem acento do Mapão.
+  ok(texto.includes('MATEMÁTICA'), 'a disciplina sai acentuada na ATA');
+  ok(!texto.includes('MATEMATICA'), 'e a grafia sem acento do Mapão não aparece');
 
   // Brasão indisponível não pode impedir a ATA de sair.
   const semBrasao = montarApp();
