@@ -19,7 +19,7 @@ const MAX_UPLOAD_BYTES=15*1024*1024;const MAX_UPLOAD_FILES=50;const MAX_IMPORTED
 // é o estado publicado enquanto a escola não implantar a sua própria cópia.
 // Fica aqui em cima, e não junto das funções de sala, porque iniciarSala() roda
 // na linha de partida do app: const declarado depois estaria na zona morta.
-const SALA_ENDPOINT='';
+const SALA_ENDPOINT='https://script.google.com/macros/s/AKfycbzIJHwQvnFb6arEA27GYuj6EU35RpWLa2qnJ_C8XeEWo_Rl1NUg1akBX42Kb13sG7Dc/exec';
 const SALA_INTERVALO_MS=8000;
 let salaId='',salaVersao=0,salaAvisouErro=false;
 function validateUploadSelection(files){if(files.length>MAX_UPLOAD_FILES)throw new Error(`Selecione no máximo ${MAX_UPLOAD_FILES} arquivos por lote.`);if(files.some(file=>file.size>MAX_UPLOAD_BYTES))throw new Error('Cada planilha deve ter no máximo 15 MB.');}

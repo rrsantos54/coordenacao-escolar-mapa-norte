@@ -51,15 +51,15 @@ Quem importa o Mapão abre uma sala e recebe um link. Quem abrir esse link vê a
 mesma lista e digita nota junto, e cada nota aparece na tela do outro em alguns
 segundos. Não precisa instalar nada nem baixar planilha.
 
-A sala só existe se `SALA_ENDPOINT`, no `app.js`, apontar para uma implantação
-do Apps Script — veja abaixo. Com o campo vazio, que é como o repositório vem, o
-app funciona exatamente como antes, inteiro dentro do navegador.
+A sala está ligada desde 10/08/2026: `SALA_ENDPOINT`, no topo do `app.js`,
+aponta para a implantação do Apps Script. Esvaziar esse campo desliga a sala e
+devolve o app ao funcionamento anterior, inteiro dentro do navegador.
 
 **O código da sala é o único segredo.** A implantação é aberta a qualquer um,
 porque não há login. Quem tiver o link entra e edita. Trate o link como se fosse
 a própria lista de notas: mande direto para quem vai ajudar, não jogue em grupo.
 
-### Ligar a sala, uma vez por escola
+### Reimplantar a caixa de dados, se precisar trocar de conta
 
 1. Em `script.google.com`, crie um projeto e cole o `apps-script/Code.gs`.
 2. Em Configurações, marque mostrar o manifesto, e cole o `appsscript.json`.

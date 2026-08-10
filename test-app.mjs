@@ -45,9 +45,15 @@ const TURMA_B = [
 // no arquivo publicado — a escola preenche com a própria implantação do Apps
 // Script. opcoes.hash entra na URL, que é como alguém chega por um link de sala.
 function montarApp(opcoes = {}) {
-  const endpoint = opcoes.sala ? 'https://script.google.com/macros/s/FALSO/exec' : '';
-  const fonte = appJs.replace("const SALA_ENDPOINT='';", `const SALA_ENDPOINT='${endpoint}';`);
-  if (opcoes.sala && !fonte.includes(endpoint)) throw new Error('SALA_ENDPOINT mudou de forma: o teste não conseguiu ligar a sala');
+  // Host que não existe de propósito: se algum dia o fetch deixar de ser
+  // substituído pelo servidor falso, o teste falha em vez de sair para a rede.
+  const endpoint = opcoes.sala ? 'https://sala-de-teste.invalido/exec' : '';
+  // Troca o valor qualquer que ele seja: o app.js publicado aponta para a
+  // implantação de verdade, e o teste nunca pode falar com ela. Quando
+  // opcoes.sala é falso o endpoint vira vazio, que é o caso "sala desligada".
+  if (!/const SALA_ENDPOINT='[^']*';/.test(appJs)) throw new Error('SALA_ENDPOINT mudou de forma: o teste não consegue controlar a sala');
+  const fonte = appJs.replace(/const SALA_ENDPOINT='[^']*';/, `const SALA_ENDPOINT='${endpoint}';`);
+  if (fonte.includes('script.google.com')) throw new Error('o teste ficou apontando para a implantação real');
   const url = `http://localhost:8899/index.html${opcoes.hash || ''}`;
   const dom = new JSDOM(html, { runScripts: 'dangerously', url });
   const { window } = dom;

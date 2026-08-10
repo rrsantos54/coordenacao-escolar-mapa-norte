@@ -247,17 +247,35 @@ A guarda no `test-parser.mjs` mudou de forma junto: era "a pasta `apps-script/` 
 
 ### O que o teste automatizado não alcança aqui
 
-O Apps Script de verdade. O `test-app.mjs` substitui o `fetch` por um servidor falso que guarda linhas e devolve linhas — a mesma fronteira do stub do SheetJS. O que segue por conferir no navegador, depois de implantar:
+O Apps Script de verdade. O `test-app.mjs` substitui o `fetch` por um servidor falso que guarda linhas e devolve linhas — a mesma fronteira do stub do SheetJS.
 
-1. Se o `POST` com `text/plain` passa mesmo sem preflight. É o ponto mais provável de dar errado.
-2. Se a resposta do `/exec` chega com CORS liberado, incluindo o redirecionamento para `script.googleusercontent.com`.
-3. A cota. Duas pessoas perguntando a versão a cada 8 segundos dá cerca de 900 requisições por hora somadas; o limite diário de um Web App é da ordem de 20 mil.
+Os três pontos que dependiam de navegador foram conferidos em 10/08/2026, com a implantação no ar e a partir da origem `https://rrsantos54.github.io`:
+
+1. **`POST` com `text/plain` passa sem preflight.** Era o mais provável de dar errado. Respondeu 200 e o corpo foi lido.
+2. **CORS liberado**, incluindo o redirecionamento para `script.googleusercontent.com`. O `GET` de `acao=versao` devolveu `{"versao":0}`.
+3. **Validação da sala responde**: código curto demais é recusado com `sala inválida`.
+
+Sobra a cota, que só o uso real mede. Duas pessoas perguntando a versão a cada 8 segundos dá cerca de 900 requisições por hora somadas; o limite diário de um Web App é da ordem de 20 mil.
+
+### A implantação — 10/08/2026
+
+- Projeto `Mapa Norte — Salas`, id `1nwWD6zmCd9rJDVjK59wgrgnmydAfP3y17RX6iLiLEQpGrim9vREJG3CR`.
+- Implantação Versão 1, App da Web, executando como o dono, acesso `ANYONE_ANONYMOUS`.
+- Conta: **`rogerio00772@gmail.com`**, pessoal.
+
+Essa conta não era a intenção. A escolha do Apps Script sobre Supabase se apoiou em o dado ficar no Drive institucional, e nenhuma conta institucional estava disponível na máquina — as opções eram `rogerio00772@gmail.com` e `busca.ativa.ure@gmail.com`, as duas Gmail comum. A primeira tentativa foi na segunda, ligada ao nome da escola, e esbarrou num defeito do Apps Script com múltiplas contas: o popup de autorização vai para `script.google.com/accounts?authuser=1` e morre em "Não foi possível abrir o arquivo" quando a conta que autoriza não é a padrão do navegador. Com a conta pessoal, que era a padrão, passou de primeira.
+
+Consequência a registrar sem rodeio: **nome, turma e nota de aluno passam a morar no Drive pessoal de uma conta particular.** Ficou assim por decisão consciente, para destravar o uso. Se um dia houver conta institucional, mudar significa refazer a implantação lá e trocar `SALA_ENDPOINT` — o código não muda em nada.
+
+Ficou um projeto `Mapa Norte — Salas` órfão na conta `busca.ativa.ure@gmail.com`, sem implantação. Pode apagar.
+
+Ao atualizar o `Code.gs` depois, usar `Gerenciar implantações` e editar a Versão 1. `Nova implantação` gera URL nova e a sala antiga fica órfã com o dado dentro.
 
 ### Estado
 
-`SALA_ENDPOINT` está vazio no repositório. A sala só existe depois que a escola implantar a sua cópia e colar a URL. Enquanto isso, o app publicado funciona exatamente como antes.
+`SALA_ENDPOINT` aponta para a implantação acima. A sala está ligada no app publicado.
 
-Isso também significa que passa a haver **outra implantação de Apps Script** para administrar, além da antiga que ainda não foi arquivada. São coisas distintas: a antiga é o app inteiro em versão defasada e deve sair do ar; a nova é só a caixa de dados.
+Isso significa que há **duas implantações de Apps Script** para administrar. São coisas distintas: a antiga, `ZZ-MORTO — nao usar`, é o app inteiro em versão defasada e deve sair do ar; a nova é só a caixa de dados.
 
 ## Arquitetura do app.js
 
@@ -282,7 +300,7 @@ Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 
 
 Revisado em 10/08/2026. Nenhum item depende de escrever código: o primeiro é implantar a caixa de dados, e o resto depende da conta institucional ou da Diretoria de Ensino.
 
-1. Implantar a caixa de dados das salas e colar a URL em `SALA_ENDPOINT`, se a escola quiser o lançamento em dupla por link. Passo a passo no `README.md`. Depois de implantar, conferir no navegador os três pontos que o teste não alcança — `POST` sem preflight, CORS no redirecionamento e cota. Ver a seção da sala.
+1. Migrar a caixa de dados das salas para uma conta institucional, se e quando existir uma. Hoje ela está no Drive pessoal de `rogerio00772@gmail.com`, com nome e nota de aluno dentro. Refazer a implantação lá e trocar `SALA_ENDPOINT`; o código não muda. Ver a seção da sala.
 2. Concluir a aposentadoria do Apps Script **antigo** pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados` e revogar o token do clasp. O segredo e a variável do GitHub já foram apagados, conferido em 10/08/2026. Não confundir com a caixa de dados nova: a antiga é o app inteiro em versão defasada e deve sair do ar. Ver a seção própria.
 3. Conferir a conta institucional usada no Google Apps Script.
 4. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
