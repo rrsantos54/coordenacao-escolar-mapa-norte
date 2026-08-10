@@ -37,12 +37,17 @@ const PUROS = [
   /^function combineRecords\(records\).*$/m,
   /^function rowStatus\(row\).*$/m,
   /^function mergeRows\(previous,incoming\).*$/m,
+  /^function notaBimestre\(v\).*$/m,
+  /^function notaRecuperacao\(v\).*$/m,
+  /^function bimestreSubstituido\(v\).*$/m,
+  /^function parseExport\(rows\).*$/m,
 ];
 
 const EXPORTA = [
   'normalizeSchoolName', 'cleanClassName', 'cleanSubject', 'TURMA_RE', 'TURMA_NOME_RE',
   'droppedStudents', 'temProvaDeRecuperacao', 'parseSheet', 'detectSchool',
   'keepRecords', 'combineRecords', 'mergeRows', 'bimester', 'parseNumber', 'rowStatus',
+  'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -51,6 +56,7 @@ const {
   normalizeSchoolName, cleanClassName, cleanSubject, TURMA_RE, TURMA_NOME_RE,
   droppedStudents, temProvaDeRecuperacao, parseSheet, detectSchool,
   keepRecords, combineRecords, mergeRows, bimester, parseNumber, rowStatus,
+  parseExport, notaRecuperacao, bimestreSubstituido,
 } = api;
 
 let checks = 0;
@@ -295,6 +301,59 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ];
   const parsed = parseSheet(rows, 'MAPAO_X_6º_ANO_PRIMEIRO_BIMESTRE.xlsx');
   eq(parsed.records.map(r => r.aluno), ['ALUNO DE VERDADE'], 'a leitura para na legenda');
+}
+
+// ------------------------------------------- planilha exportada, de volta
+// Duas pessoas dividem o lançamento numa planilha compartilhada e devolvem o
+// arquivo. Ele já vem combinado, uma linha por aluno + turma + disciplina, e
+// não pode passar pelo parser do Mapão: lá cada coluna de nota viraria matéria.
+{
+  const cabecalho = ['Aluno', 'Turma', 'Disciplina', 'Nota do primeiro bimestre', 'Nota do segundo bimestre', 'Nota da recuperação semestral', 'Bimestre substituído', 'Status'];
+
+  // O Mapão não é confundido com a exportação: lá a coluna 1 não é "Turma".
+  eq(parseExport([['ALUNO', 'M', 'MATEMATICA'], ['FULANA', '', '3']]), null, 'Mapão não é lido como exportação');
+  eq(parseExport([[]]), null, 'planilha sem cabeçalho conhecido devolve null');
+
+  const restored = parseExport([cabecalho, ['FULANA DE TAL', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído']]);
+  eq(restored.length, 1, 'uma linha restaurada');
+  eq(restored[0], ['FULANA DE TAL', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído'], 'a linha volta inteira');
+
+  // Linha em branco no fim da planilha é comum depois que alguém edita no Sheets.
+  eq(parseExport([cabecalho, ['', '', '', '', '', '', '', '']]).length, 0, 'linha sem aluno é descartada');
+
+  // Nada do arquivo é aceito como veio. Quem devolve a planilha pode ter
+  // digitado qualquer coisa na coluna de nota, e o status mente se for copiado.
+  const sujo = parseExport([cabecalho,
+    ['A', 'T', 'D', 'x', '', '99', 'sei lá', 'Concluído'],
+    ['B', 'T', 'D', '4,5', '2', '10,5', '2º bimestre', 'Concluído'],
+    ['C', 'T', 'D', '3', '3', 'Não realizou', '1º bimestre', 'Pendente'],
+    ['D', 'T', 'D', '3', '3', '7', '', 'Concluído'],
+  ]);
+  eq([sujo[0][3], sujo[0][4]], ['—', '—'], 'nota ilegível vira travessão');
+  eq(sujo[0][5], '—', 'nota de recuperação fora de 1 a 10 é recusada');
+  eq(sujo[0][6], '', 'bimestre inventado é recusado');
+  eq(sujo[0][7], 'Pendente', 'status do arquivo não é copiado: é recalculado');
+  eq(sujo[1][5], '—', 'nota quebrada como 10,5 é recusada');
+  eq(sujo[2][6], '', 'Não realizou não tem bimestre a substituir');
+  eq(sujo[2][7], 'Concluído', 'Não realizou conclui a linha');
+  eq(sujo[3][7], 'Pendente', 'nota sem bimestre escolhido segue pendente');
+
+  for (const [entrada, esperado] of [['7', '7'], [7, '7'], ['Não realizou', 'Não realizou'], ['NAO REALIZOU', 'Não realizou'], ['0', '—'], ['', '—'], [null, '—'], ['7,5', '—']]) {
+    eq(notaRecuperacao(entrada), esperado, `nota de recuperação: ${entrada}`);
+  }
+  for (const [entrada, esperado] of [['1º bimestre', '1º bimestre'], ['2º bimestre', '2º bimestre'], ['1', '1º bimestre'], ['', ''], ['3º bimestre', '']]) {
+    eq(bimestreSubstituido(entrada), esperado, `bimestre substituído: ${entrada}`);
+  }
+
+  // O merge de duas planilhas devolvidas pela metade é o ponto do trabalho em
+  // dupla: cada uma preenche parte, e o encontro não perde nem sobrescreve.
+  const daAna = parseExport([cabecalho, ['FULANA', '6A', 'MATEMATICA', '3', '4', '7', '1º bimestre', ''], ['BELTRANO', '6A', 'HISTORIA', '2', '4', '', '', '']]);
+  const doBruno = parseExport([cabecalho, ['FULANA', '6A', 'MATEMATICA', '3', '4', '', '', ''], ['BELTRANO', '6A', 'HISTORIA', '2', '4', '8', '1º bimestre', '']]);
+  const juntas = mergeRows(daAna, doBruno);
+  eq(juntas.length, 2, 'as duas metades viram um lote só');
+  eq(juntas.find(r => r[0] === 'FULANA')[5], '7', 'nota da Ana sobrevive ao arquivo do Bruno');
+  eq(juntas.find(r => r[0] === 'BELTRANO')[5], '8', 'nota do Bruno entra onde estava vazio');
+  ok(juntas.every(r => r[7] === 'Concluído'), 'as duas linhas ficam concluídas');
 }
 
 // --------------------------------------------------------- o app.js compila

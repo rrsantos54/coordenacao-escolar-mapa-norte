@@ -41,7 +41,25 @@ planilha de aluno não pode ser versionada neste repositório.
 - Lote persistido em `localStorage`, com expiração automática em 12 horas e
   botão `Apagar dados`.
 - Exportação para Excel e ATA por turma em `Imprimir / PDF`.
+- A planilha exportada volta a ser importada, para o lançamento em dupla.
 - Mantém arquivos originais intactos.
+
+## Trabalho em dupla
+
+O app não tem servidor: o lote vive no navegador de quem importou, e mandar o
+link não compartilha dado nenhum. Para duas pessoas lançarem nota ao mesmo
+tempo, o transporte é uma planilha compartilhada:
+
+1. Importe os Mapões e clique `Exportar Excel`.
+2. Suba o arquivo no Drive da escola e compartilhe com quem vai ajudar.
+3. Os dois preenchem as colunas `Nota da recuperação semestral` e
+   `Bimestre substituído`. O Google Sheets já mostra quem está editando o quê.
+4. Baixe como `.xlsx` e importe de volta no app para gerar as ATAs.
+
+Cada um pode preencher uma parte e importar os dois arquivos: a mesclagem casa
+as linhas por aluno, turma e disciplina, e o valor preenchido vence o vazio.
+Nada do arquivo devolvido é aceito sem conferência — nota, bimestre e status
+são revalidados na importação.
 
 ## Dependência de execução
 
