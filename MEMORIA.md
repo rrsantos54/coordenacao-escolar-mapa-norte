@@ -144,11 +144,11 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 ## Como o app é testado
 
-`npm test` roda os dois arquivos e soma 207 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
+`npm test` roda os dois arquivos e soma 260 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
 
-Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 132 e `test-app.mjs` imprime 75. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
+Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 161 e `test-app.mjs` imprime 99. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
 
-### test-app.mjs — 75 verificações de comportamento
+### test-app.mjs — 99 verificações de comportamento
 
 - Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
 - Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
@@ -160,9 +160,11 @@ Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 132 e `test-app.mjs`
 
 Em 08/08/2026, oito defeitos foram introduzidos de propósito no `app.js`, um de cada vez, e a suíte pegou os oito: não limpar o bimestre no `Não realizou`, voltar a excluir transferido pelo nome, tirar o escape do nome na ATA, remover a expiração de 12 horas, remover o limite de 2.000 registros, voltar a ler o bloco de legenda como aluno, voltar a incluir Arte e Educação Física, e tirar o `base href` da impressão. Vale repetir esse exercício quando a suíte crescer.
 
+Repetido em 10/08/2026 sobre a sala compartilhada, com sete mutantes. Cinco morreram de primeira; dois sobreviveram e denunciaram teste fraco, não código certo. `salvarSala` deixar o servidor vencer sobrevivia porque a linha clicada já era corrigida no servidor pelo lançamento avulso antes da mesclagem — o teste passou a disputar uma linha que só a propagação alcança. `salaLigada` devolver sempre true sobrevivia porque o app sem sala nunca chegava a digitar nota no teste. Com os dois testes corrigidos, os sete morrem.
+
 Repetido em 10/08/2026 sobre a reimportação da planilha exportada, com cinco mutantes, todos mortos: `extractWorkbook` deixar de reconhecer a exportação, copiar o status escrito no arquivo em vez de recalcular, `showImported` ignorar um lote só de planilha preenchida, aceitar qualquer texto como nota de recuperação, e deixar o `Não realizou` voltar a carregar bimestre.
 
-### test-parser.mjs — 132 verificações
+### test-parser.mjs — 161 verificações
 
 - Sem dependência e sem rede.
 - O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
@@ -215,6 +217,48 @@ Só reconhecer o próprio arquivo exportado na importação. Antes, reimportá-l
 
 O nome da escola não viaja na planilha exportada. Colocá-lo numa linha acima do cabeçalho sujaria o arquivo que as duas pessoas vão editar no Sheets, e quem gera a ATA já tem o nome no campo, guardado no `localStorage`. Se um dia a ATA sair na máquina errada, é digitar de novo.
 
+## Sala compartilhada — 10/08/2026, mesmo dia
+
+O vai e vem de planilha resolveu o transporte, não o pedido. O pedido era mandar o link e a pessoa digitar direto, acompanhando ao vivo. Isso exige servidor, e a decisão foi tomada com as duas consequências na mesa: **Apps Script como caixa de dados**, e **sem login, só o código da sala no link**.
+
+### Por que Apps Script e não Supabase
+
+O dado fica no Drive institucional, onde o Mapão já mora, sem fornecedor novo. Foi o que pesou. Supabase daria sincronia por websocket em vez de consulta a cada 8 segundos, e seria tecnicamente mais limpo, mas colocaria nome e nota de aluno num terceiro.
+
+A escolha de não exigir login tem um custo que precisa ficar escrito: **ela anula a outra vantagem do Apps Script.** A implantação tem que ser aberta a qualquer um, então o login institucional, que sairia de graça, não existe. O que sobra protegendo a lista é o código da sala, 12 caracteres sorteados por `crypto.getRandomValues`. Link vazado é lista de notas exposta. Se um dia isso incomodar, o caminho é trocar o acesso da implantação para o domínio da rede e aceitar que a pessoa faça login.
+
+### O que não se repetiu
+
+O Apps Script foi aposentado em 08/08/2026 porque havia dois parsers e uma correção entrou só num lado. A volta não recria isso: o `Code.gs` guarda linhas e devolve linhas, e não sabe o que é Mapão, nota abaixo de 5, aluno transferido ou componente sem prova.
+
+Até a identidade do aluno fica de fora dele. A chave `ALUNO|TURMA|DISCIPLINA` é montada e normalizada no `app.js`, em `chaveDaLinha`, e viaja pronta — do outro lado só se compara string com string, em `acharLinha_`. Assim a regra de quem é o mesmo aluno continua existindo num lugar só.
+
+A guarda no `test-parser.mjs` mudou de forma junto: era "a pasta `apps-script/` não existe", passou a ser "a pasta não contém parser". Ela procura marcas — `ALUNO`, nomes de funções do parser, `TRANSFERID`, lista de componentes sem prova, bimestre, o corte de 5,0 — e reprova se alguma aparecer no código, ignorando comentários. O defeito que ela protege sempre foi a regra duplicada, não o diretório.
+
+### Decisões de desenho
+
+- **A versão é um contador em `ScriptProperties`, não na planilha.** Quem acompanha pergunta a versão a cada 8 segundos; abrir a planilha a cada pergunta gastaria cota à toa. Só quando a versão muda é que o lote é baixado.
+- **A consulta não roda com a aba escondida**, e não redesenha a tabela enquanto alguém está com um seletor aberto — atualizar a lista embaixo do dedo de quem está escolhendo nota é pior que atrasar 8 segundos.
+- **Nota digitada manda uma alteração de linha só**, por chave. É isso que deixa duas pessoas digitarem juntas sem uma apagar a outra. O lote inteiro só sobe quando alguém importa Mapão.
+- **`salvarSala` busca o servidor antes e mescla com ele por base**: `mergeRows(remoto, recoveryData)`. Assim nota lançada pela outra pessoa sobrevive a uma importação, e o que a pessoa acabou de marcar aqui ainda vence. A ordem invertida desfaz propagação de `Não realizou` em silêncio, e existe teste para isso.
+- **`POST` vai com `text/plain`** de propósito. Com `application/json` o navegador manda um preflight `OPTIONS`, que o Apps Script não responde.
+- **Sala fora do ar não derruba o trabalho.** O lote segue no `localStorage`, a pessoa continua digitando, e o aviso sai uma vez, não a cada 8 segundos.
+- **`SALA_ENDPOINT` vazio desliga tudo** e é como o repositório é publicado. Ele fica no topo do `app.js`, junto das outras constantes, e não perto das funções de sala: `iniciarSala()` roda na linha de partida do app, e `const` declarado depois estaria na zona morta temporal.
+
+### O que o teste automatizado não alcança aqui
+
+O Apps Script de verdade. O `test-app.mjs` substitui o `fetch` por um servidor falso que guarda linhas e devolve linhas — a mesma fronteira do stub do SheetJS. O que segue por conferir no navegador, depois de implantar:
+
+1. Se o `POST` com `text/plain` passa mesmo sem preflight. É o ponto mais provável de dar errado.
+2. Se a resposta do `/exec` chega com CORS liberado, incluindo o redirecionamento para `script.googleusercontent.com`.
+3. A cota. Duas pessoas perguntando a versão a cada 8 segundos dá cerca de 900 requisições por hora somadas; o limite diário de um Web App é da ordem de 20 mil.
+
+### Estado
+
+`SALA_ENDPOINT` está vazio no repositório. A sala só existe depois que a escola implantar a sua cópia e colar a URL. Enquanto isso, o app publicado funciona exatamente como antes.
+
+Isso também significa que passa a haver **outra implantação de Apps Script** para administrar, além da antiga que ainda não foi arquivada. São coisas distintas: a antiga é o app inteiro em versão defasada e deve sair do ar; a nova é só a caixa de dados.
+
 ## Arquitetura do app.js
 
 - Havia uma base mais seis reatribuições de `extractWorkbook` e `showImported` empilhadas no fim do arquivo. A ordem entre elas decidia o resultado e não estava escrita em lugar nenhum, e cada camada reabria e reparseava a planilha inteira — quatro parses por arquivo.
@@ -236,12 +280,13 @@ Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 
 
 ## Próximo retorno
 
-Revisado em 10/08/2026. Nada de repositório sobrou. Os quatro itens dependem da conta institucional ou da Diretoria de Ensino, e nenhum se resolve por código.
+Revisado em 10/08/2026. Nenhum item depende de escrever código: o primeiro é implantar a caixa de dados, e o resto depende da conta institucional ou da Diretoria de Ensino.
 
-1. Concluir a aposentadoria do Apps Script pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados` e revogar o token do clasp. O segredo e a variável do GitHub já foram apagados, conferido em 10/08/2026. Ver a seção própria.
-2. Conferir a conta institucional usada no Google Apps Script.
-3. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
-4. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
+1. Implantar a caixa de dados das salas e colar a URL em `SALA_ENDPOINT`, se a escola quiser o lançamento em dupla por link. Passo a passo no `README.md`. Depois de implantar, conferir no navegador os três pontos que o teste não alcança — `POST` sem preflight, CORS no redirecionamento e cota. Ver a seção da sala.
+2. Concluir a aposentadoria do Apps Script **antigo** pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados` e revogar o token do clasp. O segredo e a variável do GitHub já foram apagados, conferido em 10/08/2026. Não confundir com a caixa de dados nova: a antiga é o app inteiro em versão defasada e deve sair do ar. Ver a seção própria.
+3. Conferir a conta institucional usada no Google Apps Script.
+4. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
+5. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
 
 Saíram da lista: as correções de 08/08/2026 foram publicadas nos PRs 23 a 27, com deploy do Pages verde em 09/08. A diferença de 2 registros entre lote consolidado e lote por bimestre está explicada na seção de método — é recência de lançamento, não defeito. A nota sobre teste antigo de `sessionStorage` não descrevia teste nenhum do repositório e virou ruído.
 

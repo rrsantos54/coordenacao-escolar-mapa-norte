@@ -41,9 +41,21 @@ const TURMA_B = [
 ];
 
 // --------------------------------------------------------------- ambiente falso
-function montarApp() {
-  const dom = new JSDOM(html, { runScripts: 'dangerously', url: 'http://localhost:8899/index.html' });
+// opcoes.sala liga a sala compartilhada trocando o SALA_ENDPOINT, que vem vazio
+// no arquivo publicado — a escola preenche com a própria implantação do Apps
+// Script. opcoes.hash entra na URL, que é como alguém chega por um link de sala.
+function montarApp(opcoes = {}) {
+  const endpoint = opcoes.sala ? 'https://script.google.com/macros/s/FALSO/exec' : '';
+  const fonte = appJs.replace("const SALA_ENDPOINT='';", `const SALA_ENDPOINT='${endpoint}';`);
+  if (opcoes.sala && !fonte.includes(endpoint)) throw new Error('SALA_ENDPOINT mudou de forma: o teste não conseguiu ligar a sala');
+  const url = `http://localhost:8899/index.html${opcoes.hash || ''}`;
+  const dom = new JSDOM(html, { runScripts: 'dangerously', url });
   const { window } = dom;
+
+  // jsdom nasce com visibilityState 'prerender', logo document.hidden true. O
+  // navegador abre a aba visível. Sem corrigir, a conferência da sala nunca
+  // rodaria no teste e o guard de aba escondida esconderia qualquer defeito.
+  Object.defineProperty(window.document, 'hidden', { value: false, configurable: true, writable: true });
 
   // Stub do SheetJS. O "arquivo" carrega as linhas em JSON; XLSX.read devolve
   // exatamente o que o SheetJS devolveria: um array de arrays.
@@ -70,8 +82,34 @@ function montarApp() {
   window.console.error = (...args) => errosDeConsole.push(args.map(String).join(' '));
   window.console.warn = (...args) => errosDeConsole.push(args.map(String).join(' '));
 
+  // Servidor de sala falso. Guarda linhas e devolve linhas, como o Apps Script:
+  // o contrato é a resposta JSON, e é ela que o app consome.
+  // opcoes.estado semeia o servidor antes do app subir: quem chega por um link
+  // de sala busca o lote na primeira linha de execução, não dá para semear depois.
+  const servidor = { versao: 0, escola: '', linhas: [], chamadas: [], forcarErro: false, ...(opcoes.estado || {}) };
+  window.fetch = async (endereco, opcoesFetch = {}) => {
+    servidor.chamadas.push({ endereco: String(endereco), corpo: opcoesFetch.body ? JSON.parse(opcoesFetch.body) : null });
+    if (servidor.forcarErro) throw new Error('rede caiu');
+    const responder = (dados) => ({ ok: true, status: 200, json: async () => dados });
+    if ((opcoesFetch.method || 'GET') === 'GET') {
+      if (String(endereco).includes('acao=versao')) return responder({ versao: servidor.versao });
+      return responder({ versao: servidor.versao, escola: servidor.escola, linhas: servidor.linhas });
+    }
+    const corpo = JSON.parse(opcoesFetch.body);
+    if (corpo.acao === 'salvar') {
+      servidor.linhas = corpo.linhas;
+      servidor.escola = corpo.escola || '';
+    }
+    if (corpo.acao === 'lancar') {
+      const alvo = servidor.linhas.find(linha => linha[0] === corpo.chave);
+      if (alvo) { alvo[6] = corpo.recuperacao; alvo[7] = corpo.bimestre; }
+    }
+    servidor.versao += 1;
+    return responder({ versao: servidor.versao });
+  };
+
   const script = window.document.createElement('script');
-  script.textContent = appJs;
+  script.textContent = fonte;
   window.document.body.appendChild(script);
 
   // As declarações do app.js são const de escopo de script: não viram
@@ -80,9 +118,14 @@ function montarApp() {
   ponte.textContent = `window.__app = {
     get recoveryData(){return recoveryData}, get schoolName(){return schoolName},
     importBatch, renderAta, restoreLocal, switchView, recoveryRows,
-    validateUploadSelection, NO_EXAM, STORAGE_KEY, MAX_STORAGE_AGE_MS
+    validateUploadSelection, NO_EXAM, STORAGE_KEY, MAX_STORAGE_AGE_MS,
+    get salaId(){return salaId}, conferirSala, chaveDaLinha
   };`;
   window.document.body.appendChild(ponte);
+
+  // O app é assíncrono em vários pontos — leitura de arquivo, chamada de sala.
+  // Drenar a fila de microtarefas é como o teste espera tudo assentar.
+  const esperar = async () => { for (let i = 0; i < 50; i++) await new Promise(r => setTimeout(r, 0)); };
 
   const subirLote = async (arquivos) => {
     const input = window.document.querySelector('#folder-input');
@@ -97,11 +140,14 @@ function montarApp() {
     });
     Object.defineProperty(input, 'files', { value: files, configurable: true });
     input.dispatchEvent(new window.Event('change', { bubbles: true }));
-    // O handler é assíncrono: espera a fila de microtarefas drenar.
-    for (let i = 0; i < 50; i++) await new Promise(r => setTimeout(r, 0));
+    await esperar();
   };
 
-  return { window, doc: window.document, app: window.__app, subirLote, escritos, impressos, errosDeConsole };
+  // A sala liga um setInterval que segura o event loop do node para sempre.
+  // Quem monta um app com sala fecha a janela no fim do bloco.
+  const fechar = () => window.close();
+
+  return { window, doc: window.document, app: window.__app, subirLote, escritos, impressos, errosDeConsole, servidor, esperar, fechar };
 }
 
 // ============================================================ 1. subir um lote
@@ -280,6 +326,113 @@ function montarApp() {
   await sozinha.subirLote([['lista-recuperacao-2026.xlsx', preenchida]]);
   eq(sozinha.app.recoveryData.length, antes, 'a planilha preenchida sozinha reconstrói o lote');
   eq(sozinha.app.recoveryData[0][5], '8', 'com as notas');
+}
+
+// ============================ 7c. sala compartilhada: o link e as duas pessoas
+{
+  // Desligada por padrão. O arquivo publicado tem SALA_ENDPOINT vazio, e o app
+  // não pode tentar falar com servidor nenhum nesse estado.
+  const semSala = montarApp();
+  await semSala.subirLote([[ARQUIVO_A, TURMA_A]]);
+  semSala.app.switchView('recovery');
+  const campoSolto = semSala.doc.querySelector('select.score-input[data-index="0"]');
+  campoSolto.value = '6';
+  campoSolto.dispatchEvent(new semSala.window.Event('change', { bubbles: true }));
+  await semSala.esperar();
+  eq(semSala.servidor.chamadas.length, 0, 'sem endpoint o app não chama a rede, nem ao importar nem ao digitar');
+  eq(semSala.app.recoveryData[0][5], '6', 'e a nota digitada fica guardada localmente do mesmo jeito');
+  eq(semSala.doc.querySelector('#sala-bar').hidden, true, 'a barra da sala fica escondida');
+
+  // Quem importa o Mapão abre a sala e ganha o link.
+  const ana = montarApp({ sala: true });
+  await ana.subirLote([[ARQUIVO_A, TURMA_A]]);
+  const codigo = ana.app.salaId;
+  ok(/^[A-Z0-9]{12}$/.test(codigo), 'importar abre uma sala com código de 12 caracteres');
+  eq(ana.doc.querySelector('#sala-bar').hidden, false, 'a barra da sala aparece');
+  ok(ana.doc.querySelector('#sala-link').value.endsWith(`#sala=${codigo}`), 'o link carrega o código');
+  eq(ana.servidor.linhas.length, ana.app.recoveryData.length, 'o lote inteiro sobe para a sala');
+  eq(ana.servidor.linhas[0][0], ana.app.chaveDaLinha(ana.app.recoveryData[0]), 'com a chave montada aqui, não lá');
+
+  // A segunda pessoa abre o link e vê a mesma lista, sem importar nada.
+  const bruno = montarApp({
+    sala: true,
+    hash: `#sala=${codigo}`,
+    estado: { versao: ana.servidor.versao, escola: ana.servidor.escola, linhas: ana.servidor.linhas.map(linha => linha.slice()) },
+  });
+  await bruno.esperar();
+  eq(bruno.app.salaId, codigo, 'o código sai do link');
+  eq(bruno.app.recoveryData.length, ana.app.recoveryData.length, 'e a lista chega pronta, sem subir planilha');
+  eq(bruno.doc.querySelectorAll('#recovery-table tr').length, ana.app.recoveryData.length, 'a tabela é desenhada');
+
+  // Bruno digita uma nota: vai uma alteração de linha só, não o lote inteiro.
+  bruno.app.switchView('recovery');
+  const seletor = bruno.doc.querySelector('select.score-input[data-index="0"]');
+  seletor.value = '8';
+  seletor.dispatchEvent(new bruno.window.Event('change', { bubbles: true }));
+  await bruno.esperar();
+  const lancamento = bruno.servidor.chamadas.map(c => c.corpo).filter(Boolean).find(c => c.acao === 'lancar');
+  ok(lancamento, 'digitar nota manda um lancamento');
+  eq(lancamento.recuperacao, '8', 'com a nota');
+  eq(lancamento.chave, bruno.app.chaveDaLinha(bruno.app.recoveryData[0]), 'e a chave da linha, não o índice');
+  eq(bruno.servidor.linhas[0][6], '8', 'o servidor guarda a nota na linha certa');
+
+  // Ana está acompanhando: a conferência periódica traz a nota do Bruno.
+  ana.servidor.linhas = bruno.servidor.linhas.map(linha => linha.slice());
+  ana.servidor.versao = bruno.servidor.versao;
+  await ana.app.conferirSala();
+  await ana.esperar();
+  eq(ana.app.recoveryData[0][5], '8', 'a nota digitada pelo Bruno aparece na tela da Ana');
+  eq(ana.app.recoveryData[0][7], 'Concluído', 'com o status recalculado do lado dela');
+
+  // Aba escondida não consulta: são duas pessoas perguntando a cada 8 segundos,
+  // e a cota do Apps Script é por dia.
+  ana.window.document.hidden = true;
+  const antesDeEsconder = ana.servidor.chamadas.length;
+  await ana.app.conferirSala();
+  eq(ana.servidor.chamadas.length, antesDeEsconder, 'aba escondida não gasta chamada');
+  ana.window.document.hidden = false;
+
+  // Sala fora do ar não pode derrubar o trabalho de ninguém.
+  const off = montarApp({ sala: true });
+  await off.subirLote([[ARQUIVO_A, TURMA_A]]);
+  off.servidor.forcarErro = true;
+  const antes = off.app.recoveryData.length;
+  const campo = off.doc.querySelector('select.score-input[data-index="0"]');
+  off.app.switchView('recovery');
+  campo.value = '9';
+  campo.dispatchEvent(new off.window.Event('change', { bubbles: true }));
+  await off.esperar();
+  eq(off.app.recoveryData.length, antes, 'o lote continua na tela');
+  eq(off.app.recoveryData[0][5], '9', 'e a nota digitada não se perde');
+  eq(off.doc.querySelector('#toast').textContent.includes('Sala fora do ar'), true, 'com aviso de que ficou só neste aparelho');
+
+  // Os dois mexeram na mesma linha: quem acabou de agir vence. Salvar o lote
+  // inteiro busca o servidor antes e mescla com ele por base, então uma nota
+  // remota antiga não pode desfazer o que a pessoa acabou de marcar aqui.
+  const disputa = montarApp({ sala: true });
+  await disputa.subirLote([[ARQUIVO_A, TURMA_A]]);
+  const indice = disputa.app.recoveryData.findIndex(r => r[0] === 'ALUNA COM TRES PENDENCIAS');
+  // A linha disputada é outra do mesmo aluno, não a que vai ser clicada: a
+  // clicada é corrigida no servidor pelo lançamento avulso antes da mesclagem,
+  // e não chega a disputar nada. Quem só a propagação alcança, sim.
+  const arrastada = disputa.app.recoveryData.findIndex((r, i) => i !== indice && r[0] === 'ALUNA COM TRES PENDENCIAS');
+  const chaveDisputada = disputa.app.chaveDaLinha(disputa.app.recoveryData[arrastada]);
+  disputa.servidor.linhas.find(linha => linha[0] === chaveDisputada)[6] = '7';
+  disputa.servidor.versao += 1;
+
+  disputa.app.switchView('recovery');
+  const seletorDisputado = disputa.doc.querySelector(`select.score-input[data-index="${indice}"]`);
+  seletorDisputado.value = disputa.app.NO_EXAM;
+  seletorDisputado.dispatchEvent(new disputa.window.Event('change', { bubbles: true }));
+  await new Promise(r => setTimeout(r, 0));
+  disputa.doc.querySelector('#confirm-ok').click();
+  await disputa.esperar();
+
+  eq(disputa.app.recoveryData[arrastada][5], disputa.app.NO_EXAM, 'o que a pessoa acabou de marcar não é desfeito por nota antiga do servidor');
+  eq(disputa.servidor.linhas.find(linha => linha[0] === chaveDisputada)[6], disputa.app.NO_EXAM, 'e o servidor recebe a marcação');
+  ok(disputa.app.recoveryData.filter(r => r[0] === 'ALUNA COM TRES PENDENCIAS').every(r => r[5] === disputa.app.NO_EXAM), 'a propagação sobrevive à mesclagem com o servidor');
+
+  [ana, bruno, off, disputa].forEach(app => app.fechar());
 }
 
 // ===================================================================== 8. limites
