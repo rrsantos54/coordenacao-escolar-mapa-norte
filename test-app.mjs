@@ -96,6 +96,10 @@ function montarApp(opcoes = {}) {
   window.fetch = async (endereco, opcoesFetch = {}) => {
     servidor.chamadas.push({ endereco: String(endereco), corpo: opcoesFetch.body ? JSON.parse(opcoesFetch.body) : null });
     if (servidor.forcarErro) throw new Error('rede caiu');
+    // O brasão da ATA em Word é buscado como binário, não como JSON.
+    if (String(endereco).includes('brasao-sp.png')) {
+      return { ok: !servidor.brasaoQuebrado, status: servidor.brasaoQuebrado ? 404 : 200, arrayBuffer: async () => new ArrayBuffer(8) };
+    }
     const responder = (dados) => ({ ok: true, status: 200, json: async () => dados });
     if ((opcoesFetch.method || 'GET') === 'GET') {
       if (String(endereco).includes('acao=versao')) return responder({ versao: servidor.versao });
@@ -112,6 +116,26 @@ function montarApp(opcoes = {}) {
     }
     servidor.versao += 1;
     return responder({ versao: servidor.versao });
+  };
+
+  // Dublê da biblioteca do Word. Ela é 1,1 MB de CDN e o app a carrega sob
+  // demanda; aqui já está no window, então carregarDocx devolve esta na hora.
+  // Cada classe guarda tipo e opções, o que deixa o teste conferir o que foi
+  // realmente montado sem depender do formato OOXML.
+  const criarClasse = (tipo) => class { constructor(opcoes) { this.tipo = tipo; this.opcoes = opcoes; } };
+  const baixados = [];
+  window.docx = {
+    Document: criarClasse('Document'), Paragraph: criarClasse('Paragraph'), TextRun: criarClasse('TextRun'),
+    Table: criarClasse('Table'), TableRow: criarClasse('TableRow'), TableCell: criarClasse('TableCell'),
+    ImageRun: criarClasse('ImageRun'),
+    AlignmentType: { CENTER: 'center' }, WidthType: { PERCENTAGE: 'pct' }, BorderStyle: { NONE: 'none' },
+    Packer: { toBlob: async (doc) => { baixados.push({ doc }); return new window.Blob(['docx']); } },
+  };
+  // jsdom não implementa nenhum dos dois.
+  window.URL.createObjectURL = () => 'blob:falso';
+  window.URL.revokeObjectURL = () => {};
+  window.HTMLAnchorElement.prototype.click = function () {
+    if (this.download) baixados[baixados.length - 1].nome = this.download;
   };
 
   const script = window.document.createElement('script');
@@ -153,7 +177,17 @@ function montarApp(opcoes = {}) {
   // Quem monta um app com sala fecha a janela no fim do bloco.
   const fechar = () => window.close();
 
-  return { window, doc: window.document, app: window.__app, subirLote, escritos, impressos, errosDeConsole, servidor, esperar, fechar };
+  // Junta todo o texto de uma árvore de objetos do dublê do docx, para o teste
+  // perguntar "isso aparece no documento?" sem conhecer a estrutura por dentro.
+  const textoDoDocumento = (no) => {
+    if (no == null) return '';
+    if (typeof no === 'string') return no;
+    if (Array.isArray(no)) return no.map(textoDoDocumento).join(' ');
+    if (typeof no === 'object') return Object.values(no).map(textoDoDocumento).join(' ');
+    return String(no);
+  };
+
+  return { window, doc: window.document, app: window.__app, subirLote, escritos, impressos, errosDeConsole, servidor, esperar, fechar, baixados, textoDoDocumento };
 }
 
 // ============================================================ 1. subir um lote
@@ -439,6 +473,73 @@ function montarApp(opcoes = {}) {
   ok(disputa.app.recoveryData.filter(r => r[0] === 'ALUNA COM TRES PENDENCIAS').every(r => r[5] === disputa.app.NO_EXAM), 'a propagação sobrevive à mesclagem com o servidor');
 
   [ana, bruno, off, disputa].forEach(app => app.fechar());
+}
+
+// ================================================= 7d. baixar a ATA em Word
+{
+  // Duas turmas de propósito: a ATA é por turma, e a de uma não pode carregar
+  // aluno da outra. Com um lote de turma única, filtrar ou não dá igual e o
+  // defeito passaria despercebido.
+  const { doc, app, subirLote, baixados, textoDoDocumento, esperar } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A], [ARQUIVO_B, TURMA_B]]);
+  app.switchView('minutes');
+
+  doc.querySelector('#download-ata-word').click();
+  await esperar();
+
+  eq(baixados.length, 1, 'gera um documento');
+  eq(baixados[0].nome, `ata-${TURMA_A_NOME.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-')}.docx`, 'com o nome da turma no arquivo');
+
+  const texto = textoDoDocumento(baixados[0].doc);
+  ok(texto.includes('ATA DE RECUPERAÇÃO SEMESTRAL — 2026'), 'o título entra no documento');
+  ok(texto.includes(TURMA_A_NOME), 'a turma entra no parágrafo de abertura');
+  ok(texto.includes('ALUNA COM TRES PENDENCIAS'), 'os alunos entram na tabela');
+  ok(texto.includes('MATEMATICA'), 'com as disciplinas');
+  ok(texto.includes('Coordenação') && texto.includes('Direção'), 'e as assinaturas');
+  ok(!texto.includes('ALUNO TRANSFERIDO'), 'quem está fora da lista continua fora da ATA');
+  ok(!texto.includes('ALUNA DA OUTRA TURMA'), 'e aluno de outra turma não entra na ATA desta');
+
+  // A ATA em Word tem que ser o mesmo documento da tela, não uma versão pobre.
+  const paragrafos = JSON.stringify(baixados[0].doc).match(/"tipo":"ImageRun"/g) || [];
+  eq(paragrafos.length, 1, 'o brasão entra como imagem');
+
+  // Brasão indisponível não pode impedir a ATA de sair.
+  const semBrasao = montarApp();
+  await semBrasao.subirLote([[ARQUIVO_A, TURMA_A]]);
+  semBrasao.servidor.brasaoQuebrado = true;
+  semBrasao.doc.querySelector('#download-ata-word').click();
+  await semBrasao.esperar();
+  eq(semBrasao.baixados.length, 1, 'sem brasão a ATA sai assim mesmo');
+  ok(!JSON.stringify(semBrasao.baixados[0].doc).includes('ImageRun'), 'só que sem a imagem');
+  ok(semBrasao.textoDoDocumento(semBrasao.baixados[0].doc).includes('ALUNA COM TRES PENDENCIAS'), 'e com os alunos no lugar');
+
+  // Trocar de ATA e baixar tem que dar a ATA que está na tela. O .selected do
+  // HTML marca sempre a primeira da lista, então quem responde isso é o ataAtual.
+  const outra = [...doc.querySelectorAll('[data-ata-class]')].find(b => b.dataset.ataClass !== TURMA_A_NOME);
+  ok(outra, 'a segunda turma tem botão de revisar ATA');
+  outra.click();
+  doc.querySelector('#download-ata-word').click();
+  await esperar();
+
+  eq(baixados.length, 2, 'gera o segundo documento');
+  const textoDaOutra = textoDoDocumento(baixados[1].doc);
+  ok(textoDaOutra.includes('ALUNA DA OUTRA TURMA'), 'a ATA baixada é a da turma que está na tela');
+  ok(!textoDaOutra.includes('ALUNA COM TRES PENDENCIAS'), 'e não a da primeira turma da lista');
+  ok(baixados[1].nome !== baixados[0].nome, 'com nome de arquivo próprio');
+  ok(outra.closest('.minute-row').classList.contains('selected'), 'e a lista passa a destacar a turma escolhida');
+
+  // De nada adianta pedir integrity se a CSP não deixa o script carregar, e de
+  // nada adianta liberar o CDN se o integrity sumir. Os dois andam juntos.
+  const csp = doc.querySelector('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+  ok(/script-src[^;]*https:\/\/cdn\.jsdelivr\.net/.test(csp), 'a CSP libera o CDN da biblioteca do Word');
+  ok(/script-src 'self'/.test(csp) && !/script-src[^;]*'unsafe-inline'/.test(csp), 'e continua sem unsafe-inline no script-src');
+
+  // Sem lote não há ATA: o botão avisa em vez de baixar arquivo vazio.
+  const vazio = montarApp();
+  vazio.doc.querySelector('#download-ata-word').click();
+  await vazio.esperar();
+  eq(vazio.baixados.length, 0, 'sem lote não gera documento');
+  ok(vazio.doc.querySelector('#toast').textContent.includes('Importe um lote'), 'e diz o que fazer');
 }
 
 // ===================================================================== 8. limites

@@ -40,7 +40,7 @@ planilha de aluno não pode ser versionada neste repositório.
   propagação para as demais disciplinas do mesmo aluno.
 - Lote persistido em `localStorage`, com expiração automática em 12 horas e
   botão `Apagar dados`.
-- Exportação para Excel e ATA por turma em `Imprimir / PDF`.
+- Exportação para Excel e ATA por turma em `Imprimir / PDF` ou `Baixar Word`.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
 - Sala compartilhada por link, quando ligada: duas pessoas lançam nota juntas.
 - Mantém arquivos originais intactos.
