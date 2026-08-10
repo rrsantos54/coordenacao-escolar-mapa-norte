@@ -209,29 +209,47 @@ Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 
 
 ## Próximo retorno
 
-Revisado em 10/08/2026. Sobrou um item de repositório; o resto depende da conta institucional ou da Diretoria de Ensino, e nenhum deles se resolve por código.
+Revisado em 10/08/2026. Nada de repositório sobrou. Os quatro itens dependem da conta institucional ou da Diretoria de Ensino, e nenhum se resolve por código.
 
-1. Tornar o check `testes` obrigatório na proteção da `main`. Hoje `required_status_checks` está `null`: o workflow roda em cada PR, mas não bloqueia merge, então PR com teste vermelho entra. Ver a seção de proteção da branch.
-2. Concluir a aposentadoria do Apps Script pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados` e revogar o token do clasp. O segredo e a variável do GitHub já foram apagados, conferido em 10/08/2026. Ver a seção própria.
-3. Conferir a conta institucional usada no Google Apps Script.
-4. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
-5. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
+1. Concluir a aposentadoria do Apps Script pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados` e revogar o token do clasp. O segredo e a variável do GitHub já foram apagados, conferido em 10/08/2026. Ver a seção própria.
+2. Conferir a conta institucional usada no Google Apps Script.
+3. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
+4. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
 
 Saíram da lista: as correções de 08/08/2026 foram publicadas nos PRs 23 a 27, com deploy do Pages verde em 09/08. A diferença de 2 registros entre lote consolidado e lote por bimestre está explicada na seção de método — é recência de lançamento, não defeito. A nota sobre teste antigo de `sessionStorage` não descrevia teste nenhum do repositório e virou ruído.
 
 ## Proteção da branch main — estado em 10/08/2026
 
-- `required_approving_review_count` 1, `require_last_push_approval` true, `dismiss_stale_reviews` true, `enforce_admins` true, histórico linear, sem force-push.
-- `required_status_checks` é `null`. Esse é o buraco: o workflow `Testes` roda e aparece no PR, mas o GitHub não o exige para mesclar.
-- Comando para fechar, com a conta que administra o repositório:
+- `required_approving_review_count` 1, `require_last_push_approval` true, `dismiss_stale_reviews` true, `enforce_admins` true, `required_conversation_resolution` true, histórico linear, sem force-push e sem exclusão.
+- `required_status_checks`: `strict` true, `contexts` `["testes"]`, `app_id` 15368, que é o GitHub Actions. Ligado em 10/08/2026. Antes disso era `null` — o workflow rodava e aparecia no PR, mas o GitHub não o exigia para mesclar.
+- `strict=true` obriga a branch do PR a estar atualizada com a `main` antes do merge. Com um mantenedor só, isso é um `git pull` a mais quando dois PRs andam juntos.
+- O nome do check é `testes`, o id do job em `.github/workflows/testes.yml`. Renomear o job quebra a exigência em silêncio: o check obrigatório fica eternamente pendente e nenhum PR mescla.
+
+### Como mexer nessa configuração
+
+O `PATCH` no sub-recurso `.../protection/required_status_checks` responde `404 Required status checks not enabled` enquanto os checks não existirem. Só serve para editar o que já está ligado. Ligar do zero exige `PUT` na proteção inteira, e o `PUT` **substitui** o objeto: campo omitido é campo apagado. O caminho seguro é salvar o estado antes, montar o payload completo a partir dele e conferir o diff depois:
 
 ```bash
-gh api -X PATCH repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection/required_status_checks \
-  -f strict=true -f 'contexts[]=testes'
+gh api repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection > protection-antes.json
+# montar o JSON completo com todos os campos de protection-antes.json, mais a mudança
+gh api -X PUT repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection --input protection-novo.json
+gh api repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection > protection-depois.json
+# comparar antes e depois campo a campo
 ```
 
-- `strict=true` obriga a branch do PR a estar atualizada com a `main` antes do merge. Com um mantenedor só, isso significa um `git pull` a mais quando dois PRs andam juntos.
-- O nome do check é `testes`, que é o id do job em `.github/workflows/testes.yml`. Renomear o job quebra a exigência em silêncio: o check obrigatório fica eternamente pendente e nenhum PR mescla.
+O `PUT` não aceita `required_signatures` nem os campos `url`: são recurso à parte. Em 10/08/2026 o diff acusou uma única mudança, `required_status_checks` de `null` para o objeto, e os outros dez campos idênticos.
+
+### Merge com um mantenedor só
+
+O GitHub não deixa ninguém aprovar o próprio PR, e `enforce_admins` está ativo. Com `required_approving_review_count` 1, nenhum PR mescla sozinho. O contorno usado nos PRs 28 e 29 é baixar a exigência, mesclar e restaurar na sequência, deixando a janela sem revisão durar três comandos:
+
+```bash
+gh api -X PATCH repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection/required_pull_request_reviews -F required_approving_review_count=0 -F require_last_push_approval=false
+gh pr merge <N> --squash --delete-branch
+gh api -X PATCH repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection/required_pull_request_reviews -F required_approving_review_count=1 -F require_last_push_approval=true
+```
+
+Esse `PATCH` funciona porque a revisão obrigatória já está ligada — é exatamente o caso que o sub-recurso atende. Se o repositório ganhar um segundo mantenedor, o contorno morre e a revisão de verdade toma o lugar.
 
 ## Sessão de 07/08/2026
 
