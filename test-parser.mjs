@@ -18,6 +18,8 @@ const PUROS = [
   /^function normal\(v\).*$/m,
   /^const SCHOOL_TITLES=.*$/m,
   /^function normalizeSchoolName\(name\).*$/m,
+  /^const DISCIPLINAS_ACENTUADAS=.*$/m,
+  /^function acentuarDisciplina\(nome\).*$/m,
   /^function cleanSubject\(v\).*$/m,
   /^function cleanClassName\(v\).*$/m,
   /^const TURMA_RE=.*$/m,
@@ -200,9 +202,9 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   const mantidos = keepRecords(parsed.records, rows);
   const chaves = mantidos.map(r => `${r.aluno}|${r.disciplina}|${r.bimestre}`).sort();
   eq(chaves, [
-    'ANA CLARA DE SOUZA|MATEMATICA|1º',
-    'ANA CLARA DE SOUZA|MATEMATICA|2º',
-    'CARLA DIAS MOTA|HISTORIA|1º',
+    'ANA CLARA DE SOUZA|MATEMÁTICA|1º',
+    'ANA CLARA DE SOUZA|MATEMÁTICA|2º',
+    'CARLA DIAS MOTA|HISTÓRIA|1º',
   ], 'só nota abaixo de 5, de aluno ativo, em componente com prova');
 
   const linhas = combineRecords(mantidos);
@@ -230,7 +232,7 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   eq(parsed.bimestre, '2º', 'bimestre vem do nome do arquivo');
   eq(detectSchool(rows), 'PREF. WALDOMIRO SAMPAIO DE SOUZA', 'escola do metadado, já normalizada');
   eq(parsed.records.length, 1, 'TOTAL e FRE(%) cortam as colunas de nota');
-  eq(parsed.records[0].disciplina, 'MATEMATICA', 'disciplina certa');
+  eq(parsed.records[0].disciplina, 'MATEMÁTICA', 'disciplina certa');
   eq(parsed.records[0].bimestre, '2º', 'registro herda o bimestre do arquivo');
 }
 
@@ -283,10 +285,36 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
 // ----------------------------------------------------------- limpeza de rótulo
 {
-  eq(cleanSubject('MATEMATICA (1B)'), 'MATEMATICA', 'tira o sufixo de bimestre');
-  eq(cleanSubject('MATEMATICA (2B)'), 'MATEMATICA', 'tira o sufixo de bimestre');
-  eq(cleanSubject('HISTORIA 12345'), 'HISTORIA', 'tira o código numérico');
+  eq(cleanSubject('MATEMATICA (1B)'), 'MATEMÁTICA', 'tira o sufixo de bimestre');
+  eq(cleanSubject('MATEMATICA (2B)'), 'MATEMÁTICA', 'tira o sufixo de bimestre');
+  eq(cleanSubject('HISTORIA 12345'), 'HISTÓRIA', 'tira o código numérico');
   eq(cleanSubject('  ARTE  '), 'ARTE', 'tira espaço');
+
+  // O Mapão manda o componente sem acento, e às vezes pela metade. A ATA é
+  // documento oficial e sai com a grafia certa.
+  const acentos = [
+    ['CIENCIAS', 'CIÊNCIAS'],
+    ['ROBOTICA', 'ROBÓTICA'],
+    ['LINGUA PORTUGUESA', 'LÍNGUA PORTUGUESA'],
+    ['EDUCACAO FISICA', 'EDUCAÇÃO FÍSICA'],
+    ['ORIENTAÇAO DE ESTUDO - MATEMATICA', 'ORIENTAÇÃO DE ESTUDO - MATEMÁTICA'],
+    ['ORIENTACAO DE ESTUDO - LINGUA PORTUGUESA', 'ORIENTAÇÃO DE ESTUDO - LÍNGUA PORTUGUESA'],
+    // Já acentuado não é mexido duas vezes.
+    ['MATEMÁTICA', 'MATEMÁTICA'],
+    // Componente fora da lista passa intacto, não vira palpite.
+    ['ELETIVAS', 'ELETIVAS'],
+    ['GEOGRAFIA', 'GEOGRAFIA'],
+    ['EMPREENDEDORISMO', 'EMPREENDEDORISMO'],
+  ];
+  for (const [entrada, esperado] of acentos) eq(cleanSubject(entrada), esperado, `acento: ${entrada}`);
+
+  // O separador volta como veio: ESPORTE-MUSICA-ARTE não tem espaço em volta
+  // do hífen, e inventar espaço mudaria o nome do componente.
+  eq(cleanSubject('ESPORTE-MUSICA-ARTE'), 'ESPORTE-MÚSICA-ARTE', 'hífen sem espaço é preservado');
+
+  // A acentuação não pode separar em duas linhas o que era o mesmo componente:
+  // a chave de mesclagem passa por normal(), que ignora acento.
+  eq(cleanSubject('MATEMATICA').normalize('NFD').replace(/[̀-ͯ]/g, ''), 'MATEMATICA', 'sem acento, a chave de mesclagem continua a mesma');
 }
 
 // ------------------------------------------------------------- linha sem aluno
@@ -330,7 +358,7 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
   const restored = parseExport([cabecalho, ['FULANA DE TAL', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído']]);
   eq(restored.length, 1, 'uma linha restaurada');
-  eq(restored[0], ['FULANA DE TAL', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído'], 'a linha volta inteira');
+  eq(restored[0], ['FULANA DE TAL', '6º ANO A', 'MATEMÁTICA', '3', '4', '7', '1º bimestre', 'Concluído'], 'a linha volta inteira');
 
   // Linha em branco no fim da planilha é comum depois que alguém edita no Sheets.
   eq(parseExport([cabecalho, ['', '', '', '', '', '', '', '']]).length, 0, 'linha sem aluno é descartada');
@@ -375,9 +403,11 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 // Apps Script do outro lado é caixa burra: compara string com string. Toda a
 // identidade do aluno é decidida aqui, e por isso a chave viaja pronta.
 {
-  const linha = ['Fulana de Tal', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído'];
+  const linha = ['Fulana de Tal', '6º ANO A', 'MATEMÁTICA', '3', '4', '7', '1º bimestre', 'Concluído'];
 
-  eq(chaveDaLinha(linha), 'FULANA DE TAL|6º ANO A|MATEMATICA', 'a chave é o trio normalizado');
+  // A chave ignora acento de propósito: é ela que casa MATEMATICA do Mapão com
+  // MATEMÁTICA já corrigida, e sem isso a mesma disciplina viraria duas linhas.
+  eq(chaveDaLinha(linha), 'FULANA DE TAL|6º ANO A|MATEMATICA', 'a chave é o trio normalizado, sem acento');
   // Acento e caixa não podem gerar duas linhas para o mesmo aluno no servidor.
   eq(chaveDaLinha(['fulana de tal', '6º ano a', 'matemática']), chaveDaLinha(['FULANA DE TAL', '6º ANO A', 'MATEMÁTICA']), 'acento e caixa dão a mesma chave');
 
