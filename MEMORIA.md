@@ -144,11 +144,11 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 ## Como o app é testado
 
-`npm test` roda os dois arquivos e soma 171 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada.
+`npm test` roda os dois arquivos e soma 207 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
 
-Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 102 e `test-app.mjs` imprime 69. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
+Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 132 e `test-app.mjs` imprime 75. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
 
-### test-app.mjs — 69 verificações de comportamento
+### test-app.mjs — 75 verificações de comportamento
 
 - Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
 - Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
@@ -160,7 +160,9 @@ Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 102 e `test-app.mjs`
 
 Em 08/08/2026, oito defeitos foram introduzidos de propósito no `app.js`, um de cada vez, e a suíte pegou os oito: não limpar o bimestre no `Não realizou`, voltar a excluir transferido pelo nome, tirar o escape do nome na ATA, remover a expiração de 12 horas, remover o limite de 2.000 registros, voltar a ler o bloco de legenda como aluno, voltar a incluir Arte e Educação Física, e tirar o `base href` da impressão. Vale repetir esse exercício quando a suíte crescer.
 
-### test-parser.mjs — 102 verificações
+Repetido em 10/08/2026 sobre a reimportação da planilha exportada, com cinco mutantes, todos mortos: `extractWorkbook` deixar de reconhecer a exportação, copiar o status escrito no arquivo em vez de recalcular, `showImported` ignorar um lote só de planilha preenchida, aceitar qualquer texto como nota de recuperação, e deixar o `Não realizou` voltar a carregar bimestre.
+
+### test-parser.mjs — 132 verificações
 
 - Sem dependência e sem rede.
 - O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
@@ -187,6 +189,31 @@ Referência em 08/08/2026, com as planilhas desta escola:
 | 14 Mapões por bimestre | 451 | 93 | PREF. WALDOMIRO SAMPAIO DE SOUZA | `48d5ecbaad8f95a16af2c2c9cc0b2948` |
 
 A diferença de 2 registros está explicada: duas alunas do 9º ANO têm nota 4 em `ORIENTAÇÃO DE ESTUDO - MATEMÁTICA` do 2º bimestre que só existe no consolidado. Os conjuntos de alunos são idênticos. É recência de lançamento, não defeito.
+
+## Trabalho em dupla — 10/08/2026
+
+A pergunta era mandar o link com o lote já carregado para outra pessoa lançar as notas, acompanhando ao vivo. Isso não existia e não podia existir do jeito imaginado: o app é página estática no Pages, o lote vive no `localStorage` do navegador de quem importou, e o link carrega o app vazio. Duas pessoas no mesmo link são duas cópias isoladas.
+
+Três caminhos foram pesados: planilha compartilhada do Drive, dividir por turma sem código nenhum, e backend de verdade com sincronia ao vivo. Escolhida a planilha compartilhada.
+
+O motivo: o trabalho colaborativo aqui é digitar nota, e o Google Sheets já faz edição simultânea com presença e histórico, na conta institucional onde o Mapão já mora. Um backend resolveria sem etapa manual, mas traz servidor, autenticação e nome e nota de aluno hospedados fora do Google institucional, com um mantenedor só. O Apps Script tinha acabado de ser aposentado por custo de manutenção de duas versões vivas; recriar um segundo lugar com estado seria andar para trás.
+
+### O fluxo
+
+Importar os Mapões, `Exportar Excel`, subir no Drive, os dois preenchem, baixar e importar de volta para gerar as ATAs.
+
+### O que precisou de código
+
+Só reconhecer o próprio arquivo exportado na importação. Antes, reimportá-lo produzia lixo: o parser procura um cabeçalho com `ALUNO` e trata as colunas seguintes como matérias, então `Nota do primeiro bimestre` virava disciplina.
+
+- `parseExport` detecta o layout pelo trio exato `ALUNO`, `TURMA`, `DISCIPLINA` nas colunas 0, 1 e 2. O Mapão nunca tem `TURMA` na coluna 1, então não há confusão entre os dois formatos.
+- Quando reconhece, `extractWorkbook` devolve `{restored}` e pula `parseSheet`, `keepRecords` e `detectSchool` — a planilha já vem combinada, uma linha por aluno + turma + disciplina.
+- O merge de duas metades sai de graça: `mergeRows` já casava por `aluno|turma|disciplina` e já preferia o valor preenchido ao `—`. Cada pessoa pode preencher uma parte e importar os dois arquivos.
+- Nada do arquivo devolvido é confiado. `notaBimestre`, `notaRecuperacao` e `bimestreSubstituido` revalidam célula a célula, e o status é recalculado por `rowStatus` em vez de copiado. Quem devolve a planilha pode ter digitado qualquer coisa, e o arquivo é entrada de fora do sistema.
+
+### O que ficou de fora de propósito
+
+O nome da escola não viaja na planilha exportada. Colocá-lo numa linha acima do cabeçalho sujaria o arquivo que as duas pessoas vão editar no Sheets, e quem gera a ATA já tem o nome no campo, guardado no `localStorage`. Se um dia a ATA sair na máquina errada, é digitar de novo.
 
 ## Arquitetura do app.js
 

@@ -247,6 +247,41 @@ function montarApp() {
   eq(escritos[0].linhas[0][0], 'Aluno', 'primeira coluna é o aluno');
 }
 
+// ========================= 7b. a planilha exportada volta preenchida (trabalho em dupla)
+// O fluxo em dupla: uma pessoa importa o Mapão, exporta, sobe a planilha num
+// Drive compartilhado, os dois preenchem as notas ao mesmo tempo, e o arquivo
+// devolvido volta para o app gerar as ATAs.
+{
+  const { doc, app, subirLote, escritos } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  doc.querySelector('#export-recovery').click();
+
+  // Preenche a coluna de recuperação da planilha exportada, como o colega faria.
+  const [cabecalho, ...linhas] = escritos[0].linhas;
+  const preenchida = [cabecalho, ...linhas.map(linha => {
+    const copia = linha.slice();
+    copia[5] = '8';
+    copia[6] = '1º bimestre';
+    return copia;
+  })];
+  const antes = app.recoveryData.length;
+
+  const outro = montarApp();
+  await outro.subirLote([[ARQUIVO_A, TURMA_A]]);
+  await outro.subirLote([['lista-recuperacao-2026.xlsx', preenchida]]);
+
+  eq(outro.app.recoveryData.length, antes, 'reimportar a planilha preenchida não duplica registro');
+  ok(outro.app.recoveryData.every(r => r[5] === '8'), 'as notas lançadas pelo colega chegam');
+  ok(outro.app.recoveryData.every(r => r[7] === 'Concluído'), 'e as linhas ficam concluídas');
+  ok(outro.app.recoveryData.every(r => r[2] !== 'Nota do primeiro bimestre'), 'nenhuma coluna de nota virou disciplina');
+
+  // Também funciona sem o Mapão na frente: a planilha preenchida sozinha basta.
+  const sozinha = montarApp();
+  await sozinha.subirLote([['lista-recuperacao-2026.xlsx', preenchida]]);
+  eq(sozinha.app.recoveryData.length, antes, 'a planilha preenchida sozinha reconstrói o lote');
+  eq(sozinha.app.recoveryData[0][5], '8', 'com as notas');
+}
+
 // ===================================================================== 8. limites
 {
   const { doc, app, subirLote } = montarApp();
