@@ -48,6 +48,9 @@ const PUROS = [
   /^function salaDaUrl\(hash\).*$/m,
   /^const SALA_ALFABETO=.*$/m,
   /^function novaSala\(sorteio=.*$/m,
+  /^const ATA_COLUNAS=.*$/m,
+  /^function celulasDaAta\(rows\).*$/m,
+  /^function nomeDoArquivoAta\(className\).*$/m,
 ];
 
 const EXPORTA = [
@@ -56,6 +59,7 @@ const EXPORTA = [
   'keepRecords', 'combineRecords', 'mergeRows', 'bimester', 'parseNumber', 'rowStatus',
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -66,6 +70,7 @@ const {
   keepRecords, combineRecords, mergeRows, bimester, parseNumber, rowStatus,
   parseExport, notaRecuperacao, bimestreSubstituido,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS,
 } = api;
 
 let checks = 0;
@@ -400,6 +405,48 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ok(!/[IO01]/.test(SALA_ALFABETO), 'sem I, O, 0 e 1: são os que se confundem ao ditar');
   // Sorteio diferente tem que dar código diferente, senão o segredo não existe.
   ok(novaSala(n => new Uint8Array(n).fill(0)) !== novaSala(n => new Uint8Array(n).fill(7)), 'bytes diferentes geram códigos diferentes');
+}
+
+// ----------------------------------------------- células da ATA em Word
+// A ATA em .docx tem que dizer exatamente o que a ATA da tela diz, campo em
+// branco incluído: é o mesmo documento, em outro formato.
+{
+  const linha = ['FULANA DE TAL', '6º ANO A', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Concluído'];
+  const celulas = celulasDaAta([linha]);
+
+  eq(celulas[0], ATA_COLUNAS, 'a primeira linha é o cabeçalho');
+  eq(celulas[0].length, 6, 'seis colunas, como a ATA da tela');
+  eq(celulas[1], ['FULANA DE TAL', 'MATEMATICA', '3', '4', '7', '1º bimestre'], 'a turma não vira coluna: ela já é o título da ATA');
+  eq(celulas[1].length, celulas[0].length, 'linha e cabeçalho com a mesma largura');
+
+  // Sem nota lançada, a ATA sai com a lacuna para preencher à mão.
+  const pendente = celulasDaAta([['ALUNO', 'T', 'HISTORIA', '2', '—', '—', '', 'Pendente']])[1];
+  eq(pendente, ['ALUNO', 'HISTORIA', '2', '—', '____', '____'], 'nota e bimestre vazios viram lacuna');
+
+  // Não realizou é informação, não lacuna: tem que aparecer escrito.
+  eq(celulasDaAta([['ALUNO', 'T', 'HISTORIA', '2', '3', 'Não realizou', '', 'Concluído']])[1][4], 'Não realizou', 'Não realizou aparece escrito na ATA');
+
+  eq(celulasDaAta([]).length, 1, 'turma sem linha nenhuma sai só com o cabeçalho');
+
+  for (const [entrada, esperado] of [
+    ['6º ANO A', 'ata-6-ano-a.docx'],
+    ['1ª SÉRIE A INTEGRAL', 'ata-1-serie-a-integral.docx'],
+    ['', 'ata-turma.docx'],
+    [null, 'ata-turma.docx'],
+  ]) {
+    eq(nomeDoArquivoAta(entrada), esperado, `nome do arquivo: ${entrada}`);
+  }
+  // Nome de arquivo não pode carregar acento nem barra: quebra download em
+  // parte dos navegadores e vira caminho no Windows.
+  ok(!/[^a-z0-9.-]/.test(nomeDoArquivoAta('9º ANO/B ÇÃO')), 'o nome sai só com letra, número, ponto e hífen');
+
+  // A biblioteca do Word vem de CDN de terceiro. Sem SRI, quem controla o CDN
+  // controla o que roda nesta página, que tem nome e nota de aluno na tela.
+  const carregador = grab(/^function carregarDocx\(\).*$/m);
+  ok(/script\.integrity=DOCX_SRI/.test(carregador), 'o script do Word é carregado com integrity');
+  ok(/script\.crossOrigin='anonymous'/.test(carregador), 'e com crossorigin, sem o qual o integrity não é verificado');
+  ok(/^const DOCX_SRI='sha384-[A-Za-z0-9+/]{64}=*';$/m.test(source), 'o SRI é um sha384 de verdade, não um placeholder');
+  ok(/^const DOCX_URL='https:\/\/[^']+@\d+\.\d+\.\d+\//m.test(source), 'a URL do CDN fixa uma versão exata: "latest" mudaria o arquivo por baixo do SRI');
 }
 
 // --------------------------------------------------------- o app.js compila

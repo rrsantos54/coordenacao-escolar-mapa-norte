@@ -88,7 +88,7 @@ Atualizado em 10/08/2026.
 - Validação com Mapão real concluída. Os itens 1, 3, 5 e 7 do "Próximo retorno" saíram da lista.
 - Correção do item 5: `normalizeSchoolName` move o título honorífico do fim para a frente, abreviado. `Waldomiro Sampaio de Souza Prefeito` vira `PREF. WALDOMIRO SAMPAIO DE SOUZA`. Aplicada nos dois pontos de detecção — nome do arquivo e metadado do Mapão — e nas duas cópias, `app.js` e `apps-script/app.html`.
 - A caixa alta preserva acento. `normal()` entra só na chave de busca do título, porque remove acento e transformaria `JOÃO` em `JOAO` no cabeçalho da ATA. O teste pegou isso.
-- O item 3 estava descrito errado: não existe geração de DOCX no código. A ATA sai por `Imprimir / PDF` (`printAta`) e há `Exportar Excel` (`exportRecovery`). Foi isso que se validou.
+- O item 3 estava descrito errado: não existia geração de DOCX no código. A ATA saía por `Imprimir / PDF` (`printAta`) e havia `Exportar Excel` (`exportRecovery`). Foi isso que se validou. Passou a existir em 10/08/2026, com o botão `Baixar Word`; ver a seção própria.
 - Homônimo em outra turma não é testável com lote real: os 93 alunos do lote por bimestre não têm nome repetido. Esse caso segue coberto só por dado sintético.
 
 ### Mapão consolidado
@@ -144,11 +144,11 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 ## Como o app é testado
 
-`npm test` roda os dois arquivos e soma 260 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
+`npm test` roda os dois arquivos e soma 299 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
 
-Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 161 e `test-app.mjs` imprime 99. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
+Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 177 e `test-app.mjs` imprime 122. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
 
-### test-app.mjs — 99 verificações de comportamento
+### test-app.mjs — 122 verificações de comportamento
 
 - Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
 - Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
@@ -164,7 +164,7 @@ Repetido em 10/08/2026 sobre a sala compartilhada, com sete mutantes. Cinco morr
 
 Repetido em 10/08/2026 sobre a reimportação da planilha exportada, com cinco mutantes, todos mortos: `extractWorkbook` deixar de reconhecer a exportação, copiar o status escrito no arquivo em vez de recalcular, `showImported` ignorar um lote só de planilha preenchida, aceitar qualquer texto como nota de recuperação, e deixar o `Não realizou` voltar a carregar bimestre.
 
-### test-parser.mjs — 161 verificações
+### test-parser.mjs — 177 verificações
 
 - Sem dependência e sem rede.
 - O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
@@ -276,6 +276,38 @@ Ao atualizar o `Code.gs` depois, usar `Gerenciar implantações` e editar a Vers
 `SALA_ENDPOINT` aponta para a implantação acima. A sala está ligada no app publicado.
 
 Isso significa que há **duas implantações de Apps Script** para administrar. São coisas distintas: a antiga, `ZZ-MORTO — nao usar`, é o app inteiro em versão defasada e deve sair do ar; a nova é só a caixa de dados.
+
+## ATA em Word — 10/08/2026
+
+Antes só existia `Imprimir / PDF` para a ATA, e o único download era o Excel da lista de recuperação. O botão `Baixar Word` gera um `.docx` de verdade, editável, para preencher data e assinaturas.
+
+Havia duas formas. A barata era HTML salvo como `.doc` com tipo `application/msword`: o Word abre e edita, custa 15 linhas e nenhuma dependência, mas não é OOXML. A escolhida foi a outra, `.docx` de verdade pela biblioteca `docx` 9.7.1, por decisão de quem usa.
+
+### O peso, e o que ele obrigou
+
+O build IIFE tem 1,1 MB. Carregar isso em toda visita seria absurdo numa rede de escola, ainda mais depois do PR 27, que existiu justamente porque CDN bloqueado quebrava o app. Então `carregarDocx` injeta o script **no clique**, uma vez só, e guarda a promessa. Consequências: quem só imprime não paga nada, e CDN bloqueado derruba apenas esse botão, com aviso mandando usar `Imprimir / PDF`.
+
+### Segurança do script de terceiro
+
+A biblioteca vem do `cdn.jsdelivr.net`, para uma página que tem nome e nota de aluno na tela. Três amarras, todas com teste:
+
+- `integrity` com sha384 fixo e `crossOrigin='anonymous'` — sem o segundo, o navegador nem verifica o primeiro.
+- URL com versão exata, `docx@9.7.1`. `latest` trocaria o arquivo por baixo do SRI e o script pararia de carregar, ou pior, alguém publicaria outro conteúdo.
+- `script-src` da CSP liberando só esse host, sem `unsafe-inline`.
+
+O `test-parser.mjs` lê essas declarações do fonte e reprova se o `integrity`, o `crossOrigin` ou a versão fixa sumirem; o `test-app.mjs` confere a CSP no `index.html`.
+
+### Um defeito achado no caminho
+
+`baixarAtaWord` precisa saber qual ATA está na tela. O `.minute-row.selected` do HTML não serve: `renderMinutes` marca sempre a primeira da lista e o clique em `Revisar ATA` nunca movia essa marca. Agora `renderAta` guarda a turma em `ataAtual`, e o clique move o destaque — o que também corrige a lista, que mostrava a turma errada em destaque desde sempre.
+
+### Verificação
+
+O `test-app.mjs` substitui o `docx` por um dublê que guarda tipo e opções de cada objeto, e o teste pergunta se o texto esperado está no documento. Isso cobre a composição, não o formato.
+
+O formato foi conferido no navegador, em 10/08/2026, contra a biblioteca de verdade servida por `python3 -m http.server`: o blob sai com o MIME do OOXML, começa com `PK` — é zip —, tem 86.453 bytes com brasão e 9.240 sem, o que prova que a imagem entra mesmo. Nenhuma exceção, então a API está usada certo. É o mesmo método de fronteira do SheetJS: o dublê cobre a lógica, o navegador cobre a biblioteca.
+
+Dez mutantes, dez mortos. Dois só morreram depois de o teste ficar mais forte: incluir aluno de outra turma na ATA sobrevivia porque o teste subia um lote de turma única, e ignorar o `ataAtual` sobrevivia porque o teste só baixava a ATA da primeira turma.
 
 ## Arquitetura do app.js
 
