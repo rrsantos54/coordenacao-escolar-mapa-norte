@@ -1,6 +1,6 @@
 # Memória — Mapa Norte
 
-Atualizado em 17/07/2026.
+Atualizado em 10/08/2026.
 
 ## Estado
 
@@ -144,9 +144,11 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 ## Como o app é testado
 
-`npm test` roda os dois arquivos e soma 191 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada.
+`npm test` roda os dois arquivos e soma 171 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada.
 
-### test-app.mjs — 58 verificações de comportamento
+Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 102 e `test-app.mjs` imprime 69. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
+
+### test-app.mjs — 69 verificações de comportamento
 
 - Carrega o `index.html` e o `app.js` reais num DOM (`jsdom`) e opera a tela como a coordenação opera.
 - Cobre o que antes só era conferido à mão: subir lote, `Não realizou` com propagação e com cancelamento por `Esc`, mesclagem de lotes sucessivos, reimportação sem duplicar, expiração de 12 horas do `localStorage`, ATA com brasão, HTML da janela de impressão, exportação para Excel, limites de 2.000 registros / 50 arquivos / 15 MB, escapamento de HTML em nome de aluno, `Apagar dados`, arquivo ilegível que não derruba o lote, e ausência de erro no console no caminho normal.
@@ -158,7 +160,7 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 Em 08/08/2026, oito defeitos foram introduzidos de propósito no `app.js`, um de cada vez, e a suíte pegou os oito: não limpar o bimestre no `Não realizou`, voltar a excluir transferido pelo nome, tirar o escape do nome na ATA, remover a expiração de 12 horas, remover o limite de 2.000 registros, voltar a ler o bloco de legenda como aluno, voltar a incluir Arte e Educação Física, e tirar o `base href` da impressão. Vale repetir esse exercício quando a suíte crescer.
 
-### test-parser.mjs — 133 verificações
+### test-parser.mjs — 102 verificações
 
 - Sem dependência e sem rede.
 - O teste lê as declarações direto do `app.js` por expressão regular, uma por linha. Por isso as funções do parser cabem em uma linha só: quebrar `parseSheet` em várias linhas quebra a extração. O teste falha alto se não achar a declaração, então o esquecimento não passa silencioso.
@@ -207,13 +209,29 @@ Fonte: FAQ – Recuperação Semestral 2026, baixado de `educacao.sp.gov.br` em 
 
 ## Próximo retorno
 
-1. Conferir conta institucional usada no Google Apps Script. Único item que sobrou da lista anterior.
-2. Atualizar teste antigo para não considerar armazenamento artificial em `sessionStorage` como falha do aplicativo. Não há teste desse tipo no repositório; a nota existe só aqui.
-3. Publicar as correções de 08/08/2026. Nada foi mesclado ainda: a proteção da `main` voltou a exigir revisão e trava tanto PR quanto push direto enquanto houver um único mantenedor.
-4. Decidir a diferença de 2 registros e 2 alunos entre o lote consolidado e o lote por bimestre das mesmas 7 turmas, caso ela importe.
-6. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
-7. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
-5. Concluir a aposentadoria do Apps Script pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados`, revogar o token do clasp e apagar o segredo e a variável no GitHub. Ver a seção própria.
+Revisado em 10/08/2026. Sobrou um item de repositório; o resto depende da conta institucional ou da Diretoria de Ensino, e nenhum deles se resolve por código.
+
+1. Tornar o check `testes` obrigatório na proteção da `main`. Hoje `required_status_checks` está `null`: o workflow roda em cada PR, mas não bloqueia merge, então PR com teste vermelho entra. Ver a seção de proteção da branch.
+2. Concluir a aposentadoria do Apps Script pelo lado do Google: arquivar a implantação, decidir o destino da planilha `Mapa Norte — Base de dados` e revogar o token do clasp. O segredo e a variável do GitHub já foram apagados, conferido em 10/08/2026. Ver a seção própria.
+3. Conferir a conta institucional usada no Google Apps Script.
+4. Confirmar com a Diretoria de Ensino se os componentes de itinerário e apoio entram na recuperação. Ver a seção de regras acima.
+5. Corrigir na origem as 4 linhas de `LAUANDA SUELI FELIPE DE BRITO` no Mapão da 1ª SÉRIE A: duas de baixa e duas ativas. Hoje o app acerta porque lê a linha completa por último, mas isso depende da ordem das linhas no arquivo.
+
+Saíram da lista: as correções de 08/08/2026 foram publicadas nos PRs 23 a 27, com deploy do Pages verde em 09/08. A diferença de 2 registros entre lote consolidado e lote por bimestre está explicada na seção de método — é recência de lançamento, não defeito. A nota sobre teste antigo de `sessionStorage` não descrevia teste nenhum do repositório e virou ruído.
+
+## Proteção da branch main — estado em 10/08/2026
+
+- `required_approving_review_count` 1, `require_last_push_approval` true, `dismiss_stale_reviews` true, `enforce_admins` true, histórico linear, sem force-push.
+- `required_status_checks` é `null`. Esse é o buraco: o workflow `Testes` roda e aparece no PR, mas o GitHub não o exige para mesclar.
+- Comando para fechar, com a conta que administra o repositório:
+
+```bash
+gh api -X PATCH repos/rrsantos54/coordenacao-escolar-mapa-norte/branches/main/protection/required_status_checks \
+  -f strict=true -f 'contexts[]=testes'
+```
+
+- `strict=true` obriga a branch do PR a estar atualizada com a `main` antes do merge. Com um mantenedor só, isso significa um `git pull` a mais quando dois PRs andam juntos.
+- O nome do check é `testes`, que é o id do job em `.github/workflows/testes.yml`. Renomear o job quebra a exigência em silêncio: o check obrigatório fica eternamente pendente e nenhum PR mescla.
 
 ## Sessão de 07/08/2026
 
