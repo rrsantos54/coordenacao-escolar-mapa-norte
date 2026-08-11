@@ -321,7 +321,7 @@ Em 11/08/2026 a mesma tabela passou a servir para um segundo problema, achado ao
 
 Junto veio a **caixa alta no fim do `cleanSubject`**. O Mapão manda quase tudo em maiúsculas, mas escapavam `Empreendedorismo` e `Atualidades` em caixa mista. Como `linhaValidada` também chama `cleanSubject`, o mesmo ponto cobre a planilha exportada que volta preenchida. No lote real: 28 componentes distintos em vez de 29, e o total de linhas não muda, porque nenhum aluno tinha as duas grafias ao mesmo tempo.
 
-Fica em aberto o par `ESPANHOL` / `LINGUA ESPANHOLA`, que tem exatamente o mesmo defeito do inglês e continua apontando para dois nomes diferentes. Nenhum dos dois aparece nas planilhas de hoje, e qual é o nome canônico é decisão da coordenação, não do código.
+O par `ESPANHOL` / `LINGUA ESPANHOLA` tem o mesmo defeito do inglês e continua apontando para dois nomes diferentes, mas **a escola não oferece espanhol** — confirmado com a coordenação em 11/08/2026. As duas entradas nunca são alcançadas e ficam na tabela sem custo. Se um dia a disciplina entrar na grade, é decidir o nome canônico e apontar as duas chaves para ele, como foi feito com o inglês.
 
 ### Verificação
 
