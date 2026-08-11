@@ -51,11 +51,15 @@ function normalizeSchoolName(name){const upper=String(name??'').replace(/\s+/g,'
 // `ORIENTAÇAO DE ESTUDO - MATEMATICA`, com cedilha e sem til. A ATA é documento
 // oficial e não pode sair assim. A chave é a forma sem acento, porque é essa
 // que chega; o valor é a grafia correta. Só entra aqui o que muda de fato.
-const DISCIPLINAS_ACENTUADAS={'LINGUA PORTUGUESA':'LÍNGUA PORTUGUESA','MATEMATICA':'MATEMÁTICA','CIENCIAS':'CIÊNCIAS','CIENCIAS DA NATUREZA':'CIÊNCIAS DA NATUREZA','HISTORIA':'HISTÓRIA','EDUCACAO FISICA':'EDUCAÇÃO FÍSICA','INGLES':'INGLÊS','LINGUA INGLESA':'LÍNGUA INGLESA','FISICA':'FÍSICA','QUIMICA':'QUÍMICA','ROBOTICA':'ROBÓTICA','MUSICA':'MÚSICA','ORIENTACAO DE ESTUDO':'ORIENTAÇÃO DE ESTUDO','PRATICAS EXPERIMENTAIS':'PRÁTICAS EXPERIMENTAIS','REDACAO E LEITURA':'REDAÇÃO E LEITURA','EDUCACAO FINANCEIRA':'EDUCAÇÃO FINANCEIRA','TECNOLOGIA E INOVACAO':'TECNOLOGIA E INOVAÇÃO','PROGRAMACAO':'PROGRAMAÇÃO','INICIACAO CIENTIFICA':'INICIAÇÃO CIENTÍFICA','EDUCACAO SOCIOEMOCIONAL':'EDUCAÇÃO SOCIOEMOCIONAL','MATEMATICA FINANCEIRA':'MATEMÁTICA FINANCEIRA','LIDERANCA':'LIDERANÇA','ESPANHOL':'ESPANHOL','LINGUA ESPANHOLA':'LÍNGUA ESPANHOLA'};
+const DISCIPLINAS_ACENTUADAS={'LINGUA PORTUGUESA':'LÍNGUA PORTUGUESA','MATEMATICA':'MATEMÁTICA','CIENCIAS':'CIÊNCIAS','CIENCIAS DA NATUREZA':'CIÊNCIAS DA NATUREZA','HISTORIA':'HISTÓRIA','EDUCACAO FISICA':'EDUCAÇÃO FÍSICA','INGLES':'LÍNGUA INGLESA','LINGUA INGLESA':'LÍNGUA INGLESA','FISICA':'FÍSICA','QUIMICA':'QUÍMICA','ROBOTICA':'ROBÓTICA','MUSICA':'MÚSICA','ORIENTACAO DE ESTUDO':'ORIENTAÇÃO DE ESTUDO','PRATICAS EXPERIMENTAIS':'PRÁTICAS EXPERIMENTAIS','REDACAO E LEITURA':'REDAÇÃO E LEITURA','EDUCACAO FINANCEIRA':'EDUCAÇÃO FINANCEIRA','TECNOLOGIA E INOVACAO':'TECNOLOGIA E INOVAÇÃO','PROGRAMACAO':'PROGRAMAÇÃO','INICIACAO CIENTIFICA':'INICIAÇÃO CIENTÍFICA','EDUCACAO SOCIOEMOCIONAL':'EDUCAÇÃO SOCIOEMOCIONAL','MATEMATICA FINANCEIRA':'MATEMÁTICA FINANCEIRA','LIDERANCA':'LIDERANÇA','ESPANHOL':'ESPANHOL','LINGUA ESPANHOLA':'LÍNGUA ESPANHOLA'};
 // Componente composto vem como `X - Y`, e cada lado precisa ser acertado. O
 // separador é preservado como veio, porque `ESPORTE-MUSICA-ARTE` não tem espaço.
 function acentuarDisciplina(nome){return String(nome??'').split(/(\s*-\s*)/).map(parte=>/^\s*-\s*$/.test(parte)?parte:(DISCIPLINAS_ACENTUADAS[normal(parte)]||parte)).join('')}
-function cleanSubject(v){return acentuarDisciplina(String(v??'').replace(/\s*\([12]B\)\s*$/i,'').replace(/\s+\d{3,6}\s*$/,'').trim())}
+// Caixa alta em tudo: o Mapão manda quase todo componente em maiúsculas, mas
+// escapam alguns em caixa mista ("Empreendedorismo", "Atualidades"), e a ATA é
+// documento oficial. Uniformizar aqui também evita que o mesmo componente saia
+// em duas linhas por causa da caixa.
+function cleanSubject(v){return acentuarDisciplina(String(v??'').replace(/\s*\([12]B\)\s*$/i,'').replace(/\s+\d{3,6}\s*$/,'').trim().toUpperCase())}
 function cleanClassName(v){return String(v??'').replace(/\.(xlsx|xls)$/i,'').replace(/[_]+/g,' ').replace(/\s+/g,' ').trim()}
 // Fundamental usa ANO, ensino médio usa SÉRIE, e o ordinal vem º, ° ou ª.
 // No Mapão consolidado a turma só existe no nome do arquivo.
