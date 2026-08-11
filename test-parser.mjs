@@ -57,7 +57,7 @@ const PUROS = [
 
 const EXPORTA = [
   'normalizeSchoolName', 'cleanClassName', 'cleanSubject', 'TURMA_RE', 'TURMA_NOME_RE',
-  'droppedStudents', 'temProvaDeRecuperacao', 'parseSheet', 'detectSchool',
+  'droppedStudents', 'SEM_PROVA_RECUPERACAO', 'temProvaDeRecuperacao', 'parseSheet', 'detectSchool',
   'keepRecords', 'combineRecords', 'mergeRows', 'bimester', 'parseNumber', 'rowStatus',
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
@@ -68,7 +68,7 @@ const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };
 const api = await import('data:text/javascript,' + encodeURIComponent(modulo));
 const {
   normalizeSchoolName, cleanClassName, cleanSubject, TURMA_RE, TURMA_NOME_RE,
-  droppedStudents, temProvaDeRecuperacao, parseSheet, detectSchool,
+  droppedStudents, SEM_PROVA_RECUPERACAO, temProvaDeRecuperacao, parseSheet, detectSchool,
   keepRecords, combineRecords, mergeRows, bimester, parseNumber, rowStatus,
   parseExport, notaRecuperacao, bimestreSubstituido,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
@@ -154,20 +154,27 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ok(droppedStudents([cab, ['', 'Transferido', ''], ['JOÃO DA SILVA', 'Transferido', '2']]).has('JOAO DA SILVA'), 'chave sem acento');
 }
 
-// --------------------------------------------- componentes sem prova (FAQ 6.1)
+// ------------------------------------------------ componentes sem prova (lista)
 {
+  // Arte, Educação Física, Projeto de Vida e Redação e Leitura voltaram a constar
+  // por opção interna da coordenação, mais abrangente que o item 6.1 do FAQ.
   for (const d of ['ARTE', 'Arte', 'EDUCACAO FISICA', 'Educação Física', 'PROJETO DE VIDA', 'REDAÇAO E LEITURA', 'Redação e Leitura']) {
-    eq(temProvaDeRecuperacao(d), false, `devia ficar fora: ${d}`);
+    eq(temProvaDeRecuperacao(d), true, `devia voltar a constar: ${d}`);
   }
   for (const d of ['MATEMATICA', 'LINGUA PORTUGUESA', 'HISTORIA', 'GEOGRAFIA', 'CIENCIAS', 'BIOLOGIA', 'FISICA', 'QUIMICA', 'FILOSOFIA', 'SOCIOLOGIA', 'LINGUA INGLESA']) {
     eq(temProvaDeRecuperacao(d), true, `devia entrar: ${d}`);
   }
-  // ESPORTE-MUSICA-ARTE termina em ARTE e não pode ser pego pela exclusão.
-  eq(temProvaDeRecuperacao('ESPORTE-MUSICA-ARTE'), true, 'comparação é exata, não por trecho');
-  // Componentes de itinerário seguem na lista até a Diretoria de Ensino confirmar.
   for (const d of ['ORIENTAÇAO DE ESTUDO - MATEMATICA', 'PRATICAS EXPERIMENTAIS', 'ROBOTICA', 'ELETIVAS']) {
-    eq(temProvaDeRecuperacao(d), true, `ainda não é para excluir: ${d}`);
+    eq(temProvaDeRecuperacao(d), true, `não é para excluir: ${d}`);
   }
+  // O filtro continua funcionando: quem entrar na lista sai da recuperação, e a
+  // comparação é do nome inteiro, não por trecho — ESPORTE-MUSICA-ARTE termina
+  // em ARTE e não pode ser pego por uma exclusão de ARTE.
+  SEM_PROVA_RECUPERACAO.add('ARTE');
+  eq(temProvaDeRecuperacao('Arte'), false, 'nome na lista fica fora');
+  eq(temProvaDeRecuperacao('ESPORTE-MUSICA-ARTE'), true, 'comparação é exata, não por trecho');
+  SEM_PROVA_RECUPERACAO.delete('ARTE');
+  eq(temProvaDeRecuperacao('Arte'), true, 'lista volta a ficar vazia');
 }
 
 // ------------------------------------------------------------------ nota crua
@@ -202,10 +209,12 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   const mantidos = keepRecords(parsed.records, rows);
   const chaves = mantidos.map(r => `${r.aluno}|${r.disciplina}|${r.bimestre}`).sort();
   eq(chaves, [
+    'ANA CLARA DE SOUZA|ARTE|1º',
+    'ANA CLARA DE SOUZA|ARTE|2º',
     'ANA CLARA DE SOUZA|MATEMÁTICA|1º',
     'ANA CLARA DE SOUZA|MATEMÁTICA|2º',
     'CARLA DIAS MOTA|HISTÓRIA|1º',
-  ], 'só nota abaixo de 5, de aluno ativo, em componente com prova');
+  ], 'toda nota abaixo de 5 de aluno ativo, Arte incluída');
 
   const linhas = combineRecords(mantidos);
   const ana = linhas.find(l => l[0] === 'ANA CLARA DE SOUZA');
