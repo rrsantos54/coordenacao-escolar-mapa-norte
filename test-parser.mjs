@@ -314,8 +314,22 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
     ['ELETIVAS', 'ELETIVAS'],
     ['GEOGRAFIA', 'GEOGRAFIA'],
     ['EMPREENDEDORISMO', 'EMPREENDEDORISMO'],
+    // INGLÊS e LÍNGUA INGLESA são a mesma matéria e saem com um nome só.
+    ['INGLES', 'LÍNGUA INGLESA'],
+    ['INGLÊS', 'LÍNGUA INGLESA'],
+    ['LINGUA INGLESA', 'LÍNGUA INGLESA'],
   ];
   for (const [entrada, esperado] of acentos) eq(cleanSubject(entrada), esperado, `acento: ${entrada}`);
+
+  // O Mapão deixa escapar componente em caixa mista. A ATA sai toda em
+  // maiúsculas, inclusive o que não está na tabela de acentos.
+  const caixa = [
+    ['Empreendedorismo', 'EMPREENDEDORISMO'],
+    ['Atualidades', 'ATUALIDADES'],
+    ['Matematica', 'MATEMÁTICA'],
+    ['Orientação de Estudo - Matemática', 'ORIENTAÇÃO DE ESTUDO - MATEMÁTICA'],
+  ];
+  for (const [entrada, esperado] of caixa) eq(cleanSubject(entrada), esperado, `caixa: ${entrada}`);
 
   // O separador volta como veio: ESPORTE-MUSICA-ARTE não tem espaço em volta
   // do hífen, e inventar espaço mudaria o nome do componente.
