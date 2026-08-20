@@ -108,7 +108,11 @@ function droppedStudents(rows){const transferred=new Set(),active=new Set();rows
 const SEM_PROVA_RECUPERACAO=new Set(['ARTE','ARTES','EDUCACAO FISICA','PROJETO DE VIDA','REDACAO E LEITURA','TECNOLOGIA E INOVACAO']);
 function temProvaDeRecuperacao(disciplina){return !SEM_PROVA_RECUPERACAO.has(normal(disciplina))}
 function subjectPeriod(v,fallback){const match=normal(v).match(/\(([12])B\)/);return match?`${match[1]}º`:fallback}
-function findTurma(rows,fileName){for(const row of rows){for(let i=0;i<row.length;i++){if(normal(row[i])==='TURMA:'||normal(row[i])==='TURMA'){const value=row.slice(i+1).find(v=>String(v??'').trim());if(value)return cleanClassName(value)}}}const fallback=rows.flat().map(v=>String(v??'').trim()).find(v=>TURMA_RE.test(v));if(fallback)return cleanClassName(fallback);const fromName=String(fileName).replace(/\.(xlsx|xls)$/i,'').match(TURMA_NOME_RE);return fromName?cleanClassName(fromName[0]):'Turma não identificada'}
+// O Mapão consolidado não traz linha de metadados, então a turma vem do nome do
+// arquivo. Baixar duas vezes faz o navegador numerar — "… ANUAL (1).xlsx" —, e
+// o sufixo entrava na turma: o mesmo 6º ano virava duas turmas, e o Mapão
+// pós-recuperação não achava nenhuma das linhas da lista. O (n) sai antes.
+function findTurma(rows,fileName){for(const row of rows){for(let i=0;i<row.length;i++){if(normal(row[i])==='TURMA:'||normal(row[i])==='TURMA'){const value=row.slice(i+1).find(v=>String(v??'').trim());if(value)return cleanClassName(value)}}}const fallback=rows.flat().map(v=>String(v??'').trim()).find(v=>TURMA_RE.test(v));if(fallback)return cleanClassName(fallback);const fromName=String(fileName).replace(/\.(xlsx|xls)$/i,'').replace(/\s*\(\d+\)\s*$/,'').match(TURMA_NOME_RE);return fromName?cleanClassName(fromName[0]):'Turma não identificada'}
 function bimester(name,metadata=[]){const file=normal(name).replace(/[_-]+/g,' ');const meta=normal(metadata.flat().join(' '));const second=value=>value.includes('SEGUNDO BIMESTRE')||/(^|\D)2\s*[º°O]?\s*BIM/.test(value);const first=value=>value.includes('PRIMEIRO BIMESTRE')||/(^|\D)1\s*[º°O]?\s*BIM/.test(value);if(second(file))return'2º';if(first(file))return'1º';if(second(meta))return'2º';return'1º'}
 function parseNumber(v){const raw=typeof v==='number'?v:String(v??'').replace(',','.').replace(/[^0-9.-]/g,'');if(raw==='')return null;const value=Number(raw);return Number.isFinite(value)&&value>=0&&value<=10?value:null}
 // A costura entre a planilha e a lógica é o array de linhas que o SheetJS entrega.

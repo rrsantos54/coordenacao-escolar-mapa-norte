@@ -383,6 +383,30 @@ trouxe a cor para a planilha e levou o total para 477 verificações, 273 no
 não pintar a planilha, pintar sem cor nenhuma, e deixar cair quando o CDN da
 biblioteca de cor não responde.
 
+## Nome de arquivo repetido pelo navegador — 20/08/2026
+
+Sintoma relatado pela coordenação: "no 6º ano ninguém recuperou". Não era o
+caso — comparando o Mapão de 08/08 com o pós-recuperação baixado no mesmo dia,
+32 células mudaram e 19 componentes alcançaram 5,0.
+
+O Mapão consolidado não traz linha de metadados: o cabeçalho `ALUNO` está na
+primeira linha, então `findTurma` cai no nome do arquivo. O arquivo pós tinha
+sido baixado duas vezes, e o navegador numerou a segunda cópia:
+`Mapao_Consolidado_6° ANO A INTEGRAL 9H ANUAL (1).xlsx`. A `TURMA_NOME_RE`
+termina em `[^_\-]*`, que engole tudo que não seja `_` ou `-` — inclusive o
+` (1)`. Resultado: a mesma turma virava `6° ANO A INTEGRAL 9H ANUAL` num
+arquivo e `6° ANO A INTEGRAL 9H ANUAL (1)` no outro, a chave
+`aluno|turma|disciplina` deixava de casar, e as 54 linhas do 6º ano voltavam
+como `linha não encontrada no Mapão pós-recuperação`.
+
+Correção de uma linha: `findTurma` descarta `(n)` no fim do nome antes de
+procurar a turma. Com o sufixo fora, o mesmo par de arquivos dá 19 `Recuperou`,
+35 `Não recuperou` e nenhuma divergência.
+
+Vale para qualquer download repetido, não só para este caso — e é o tipo de
+diferença que não aparece na tela: o app dizia que o arquivo estava certo, e a
+lista ficava toda pendente sem explicação óbvia.
+
 ## Importação do Mapão pós-recuperação — 20/08/2026
 
 A nota da Avaliação de Recuperação Semestral foi lançada na Sala do Futuro e o
