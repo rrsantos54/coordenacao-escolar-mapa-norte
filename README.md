@@ -52,7 +52,9 @@ planilha de aluno não pode ser versionada neste repositório.
   `Não recuperou` em vermelho; nota a partir de 5,0 e `Recuperou` em verde.
 - Quem não recuperou sai com `-` no bimestre substituído, porque não há bimestre
   a substituir.
-- As três colunas de nota saem centralizadas nas quatro saídas da ATA.
+- Notas e bimestre substituído saem centralizados nas quatro saídas da ATA.
+- Aluno com vários componentes aparece uma vez só, com a célula do nome mesclada
+  para baixo, e o nome não quebra linha.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
 - Sala compartilhada por link, quando ligada: duas pessoas lançam nota juntas.
 - Mantém arquivos originais intactos.

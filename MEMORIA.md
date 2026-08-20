@@ -371,6 +371,49 @@ Como as quatro saídas alinham de formas diferentes, a regra é uma função só
 
 O cabeçalho das colunas de nota acompanha a centralização, nas quatro saídas.
 
+### Nome do aluno mesclado, e a ATA arrumada para imprimir — 20/08/2026
+
+Quatro pedidos juntos, todos de acabamento da ATA impressa: centralizar o
+bimestre substituído, não quebrar o nome do aluno, ajustar as larguras das
+colunas, e mostrar o nome uma vez só para quem ficou em vários componentes.
+
+**Nome uma vez por bloco.** `blocosDoAluno` mede cada sequência de linhas do
+mesmo aluno e devolve o tamanho na primeira linha do bloco, com 0 nas demais.
+Cada saída mescla do seu jeito, mas todas perguntam a mesma coisa:
+
+- **Tela e impressão**: uma grade de CSS não mescla célula. O efeito vem de
+  duas coisas — a célula das linhas seguintes sai vazia, e a de cima perde a
+  `border-bottom` (classe `aluno-mesclado`). A última linha do bloco mantém a
+  borda, que é o que fecha o desenho.
+- **Word**: `verticalMerge` com `VerticalMergeType.RESTART` na primeira e
+  `CONTINUE` nas seguintes, mais `verticalAlign: CENTER` para o nome ficar no
+  meio do bloco. Conferido contra o docx 9.7.1 de verdade antes de escrever o
+  código: gera `<w:vMerge w:val="restart">` e `<w:vAlign w:val="center">`.
+- **Excel**: `sheet['!merges']` com um intervalo por bloco de mais de uma
+  linha, e o nome apagado das linhas seguintes. Também conferido no arquivo
+  gerado: sai `<mergeCell ref="A2:A3"/>`.
+
+Só sequência é agrupada. Aluno que aparecer em dois trechos separados vira dois
+blocos — o certo a fazer quando a ordem das linhas não os deixou juntos.
+
+**Larguras.** `LARGURAS_DA_ATA` (dxa, para o Word) e `LARGURAS_DA_ATA_EXCEL`
+(wch) guardam a mesma proporção que a grade do CSS usa em `fr`: aluno e
+disciplina são texto e precisam de espaço, nota é um dígito. A coluna do aluno
+é `minmax(max-content, 2.6fr)` com `white-space: nowrap`, então o nome nunca
+quebra e a coluna cresce até caber o mais longo da turma. O `overflow: hidden`
+que já existia em `.paper-table span` cortaria o nome em silêncio, e é por isso
+que a classe `aluno` traz `overflow: visible` junto.
+
+**Centralização** passou a incluir o bimestre substituído: `COLUNAS_DE_NOTA`
+continua sendo o conjunto de cor, e `COLUNAS_CENTRALIZADAS` é o de alinhamento.
+Eram o mesmo conjunto até aqui, e separá-los foi o que evitou centralizar o
+desfecho por tabela.
+
+Uma armadilha de teste apareceu no caminho: `deepStrictEqual` compara protótipo,
+e array montado dentro do jsdom vem de outro realm. Comparação de lista contra
+lista no `test-app.mjs` precisa virar texto (`join('|')`), senão falha com
+`actual` e `expected` idênticos na tela.
+
 ### Traço no bimestre de quem não recuperou
 
 Mesmo pedido, terceira parte: quem não recuperou não substitui bimestre nenhum,

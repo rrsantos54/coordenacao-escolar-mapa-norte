@@ -58,11 +58,13 @@ const PUROS = [
   /^function novaSala\(sorteio=.*$/m,
   /^const ATA_COLUNAS=.*$/m,
   /^const COLUNAS_DE_NOTA=.*$/m,
-  /^function notaCentralizada\(coluna\).*$/m,
+  /^const COLUNAS_CENTRALIZADAS=.*$/m,
+  /^function celulaCentralizada\(coluna\).*$/m,
   /^function notaBaixa\(v\).*$/m,
   /^function notaAlta\(v\).*$/m,
   /^function classeDaCelula\(coluna,valor\).*$/m,
   /^function classesDaCelula\(coluna,valor\).*$/m,
+  /^function blocosDoAluno\(linhas\).*$/m,
   /^function bimestreDaAta\(row\).*$/m,
   /^function celulasDaAta\(rows\).*$/m,
   /^function nomeDoArquivoAta\(className,ext='docx'\).*$/m,
@@ -75,7 +77,7 @@ const EXPORTA = [
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
-  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -87,7 +89,7 @@ const {
   parseExport, notaRecuperacao, bimestreSubstituido,
   NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
-  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno,
 } = api;
 
 let checks = 0;
@@ -836,8 +838,27 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   eq(classesDaCelula(4, '7'), 'nota-recuperou nota-centro', 'nota a partir de 5 sai verde e centralizada');
   eq(classesDaCelula(3, '____'), 'nota-centro', 'lacuna de nota é centralizada mesmo sem cor');
   eq(classesDaCelula(0, 'ALUNA'), '', 'nome de aluno não é centralizado');
-  eq(classesDaCelula(5, '-'), '', 'o traço do bimestre não é centralizado');
+  eq(classesDaCelula(5, '-'), 'nota-centro', 'o bimestre substituído é centralizado, sem cor');
+  eq(classesDaCelula(5, '1º bimestre'), 'nota-centro', 'e o bimestre escrito também');
   eq(classesDaCelula(6, 'Recuperou'), 'nota-recuperou', 'o desfecho tem cor, não centralização');
+  eq(classesDaCelula(1, 'MATEMÁTICA'), '', 'disciplina é texto: fica à esquerda');
+}
+
+// ------------------------------------------- nome do aluno uma vez por bloco
+// Quem tem vários componentes ocupa linhas seguidas. O nome sai uma vez, na
+// primeira linha do bloco, e a célula é mesclada para baixo em todas as saídas.
+{
+  const linha = (aluno, disciplina) => [aluno, disciplina, '3', '—', '____', '____', '____'];
+  eq(blocosDoAluno([]), [], 'turma vazia não tem bloco');
+  eq(blocosDoAluno([linha('ANA', 'MATEMÁTICA')]), [1], 'aluno com um componente é um bloco de uma linha');
+  eq(blocosDoAluno([linha('ANA', 'MATEMÁTICA'), linha('ANA', 'HISTÓRIA'), linha('ANA', 'GEOGRAFIA')]), [3, 0, 0],
+    'três componentes do mesmo aluno viram um bloco de três, e o tamanho fica na primeira linha');
+  eq(blocosDoAluno([linha('ANA', 'MATEMÁTICA'), linha('BRUNO', 'HISTÓRIA')]), [1, 1], 'alunos diferentes não se juntam');
+  eq(blocosDoAluno([linha('ANA', 'MATEMÁTICA'), linha('BRUNO', 'HISTÓRIA'), linha('ANA', 'GEOGRAFIA')]), [1, 1, 1],
+    'só sequência agrupa: aluno separado por outro vira dois blocos');
+  const somaDosBlocos = linhas => blocosDoAluno(linhas).reduce((total, n) => total + n, 0);
+  eq(somaDosBlocos([linha('ANA', 'A'), linha('ANA', 'B'), linha('BRUNO', 'C'), linha('BRUNO', 'D'), linha('CARLA', 'E')]), 5,
+    'os blocos cobrem todas as linhas, sem sobra nem falta');
 }
 
 
