@@ -498,6 +498,28 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ok(novaSala(n => new Uint8Array(n).fill(0)) !== novaSala(n => new Uint8Array(n).fill(7)), 'bytes diferentes geram códigos diferentes');
 }
 
+// -------------------------------- nome de arquivo repetido pelo navegador
+// Baixar o mesmo Mapão duas vezes gera "… ANUAL (1).xlsx". O conteúdo é o
+// mesmo, então a turma tem que ser a mesma: com o sufixo dentro do nome da
+// turma, a chave muda e o Mapão pós-recuperação não acha linha nenhuma.
+{
+  const planilha = [
+    ['ALUNO', 'SITUAÇÃO', 'MATEMATICA (1B)', 'MATEMATICA (2B)'],
+    ['ALUNA DE TESTE', 'Ativo', '3', '8'],
+  ];
+  const semSufixo = parseSheet(planilha, 'Mapao_Consolidado_6° ANO A INTEGRAL 9H ANUAL.xlsx');
+  const comSufixo = parseSheet(planilha, 'Mapao_Consolidado_6° ANO A INTEGRAL 9H ANUAL (1).xlsx');
+  eq(comSufixo.turma, semSufixo.turma, 'o (1) do download repetido não entra no nome da turma');
+  eq(comSufixo.turma, '6° ANO A INTEGRAL 9H ANUAL', 'e a turma é a do Mapão');
+  eq(parseSheet(planilha, 'Mapao_Consolidado_6° ANO A INTEGRAL 9H ANUAL (12).xlsx').turma, semSufixo.turma, 'com dois dígitos também');
+
+  // A mesma linha, vinda dos dois nomes, tem que casar na chave — que é o que
+  // aplicarPosRecuperacao usa para achar o componente no Mapão pós.
+  const [linhaA] = combineRecords(semSufixo.records);
+  const [linhaB] = combineRecords(comSufixo.records);
+  eq(chaveDaLinha(linhaA), chaveDaLinha(linhaB), 'e as duas linhas casam na chave');
+}
+
 // ----------------------------------------------- células da ATA em Word
 // A ATA em .docx tem que dizer exatamente o que a ATA da tela diz, campo em
 // branco incluído: é o mesmo documento, em outro formato.
