@@ -590,6 +590,58 @@ function montarApp(opcoes = {}) {
   ok(vazio.doc.querySelector('#toast').textContent.includes('Importe um lote'), 'e diz o que fazer');
 }
 
+// ================================================= 7e. baixar a ATA em Excel
+// Mesmo botão de sempre ao lado de Imprimir / PDF e Baixar Word, mesma lista de
+// alunos que celulasDaAta já entrega para o Word — só muda o formato do arquivo.
+{
+  const { doc, app, subirLote, escritos } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A], [ARQUIVO_B, TURMA_B]]);
+  app.switchView('minutes');
+
+  doc.querySelector('#download-ata-excel').click();
+
+  eq(escritos.length, 1, 'gera um arquivo');
+  const nomeEsperado = `ata-${TURMA_A_NOME.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-')}.xlsx`;
+  eq(escritos[0].nome, nomeEsperado, 'com o nome da turma e extensão xlsx');
+  eq(escritos[0].linhas[0].length, 7, 'sete colunas, como a ATA em Word');
+  eq(escritos[0].linhas[0][0], 'Aluno', 'primeira coluna é o aluno');
+  const semCabecalho = escritos[0].linhas.slice(1);
+  ok(semCabecalho.some(l => l[0] === 'ALUNA COM TRES PENDENCIAS'), 'traz os alunos da turma selecionada');
+  ok(!semCabecalho.some(l => l[0] === 'ALUNA DA OUTRA TURMA'), 'e não os de outra turma');
+
+  // Sem lote não há ATA: o botão avisa em vez de baixar arquivo vazio.
+  const vazio = montarApp();
+  vazio.doc.querySelector('#download-ata-excel').click();
+  eq(vazio.escritos.length, 0, 'sem lote não gera arquivo');
+  ok(vazio.doc.querySelector('#toast').textContent.includes('Importe um lote'), 'e diz o que fazer');
+}
+
+// ==================================== 7f. notas abaixo de 5 em vermelho, Recuperou em verde
+// Cor entra na ATA — tela, impressão e Word — não na lista de recuperação da
+// tela, que já tinha a própria cor (low-score, em laranja) antes desta mudança.
+{
+  const { doc, app, subirLote, subirPos, impressos } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  await subirPos([[ARQUIVO_A, TURMA_A_POS]]);
+  app.switchView('minutes');
+  doc.querySelector('#generate-minutes').click();
+  app.renderAta(TURMA_A_NOME);
+
+  const paper = doc.querySelector('.paper-table').innerHTML;
+  ok(paper.includes('class="nota-baixa">3<'), 'nota do primeiro bimestre abaixo de 5 sai em vermelho na tela');
+  ok(paper.includes('class="nota-baixa">4<'), 'nota de recuperação abaixo de 5 (quem não recuperou) também sai em vermelho');
+  ok(paper.includes('class="nota-recuperou">Recuperou<'), 'quem recuperou sai em verde');
+  ok(!/class="nota-baixa">Recuperou</.test(paper), 'Recuperou nunca sai como nota baixa');
+
+  // A janela de impressão não carrega o styles.css: as duas regras têm que ir
+  // no <style> que printAta escreve, senão a cor não aparece no PDF impresso.
+  doc.querySelector('#print-ata').click();
+  const impresso = impressos[impressos.length - 1];
+  ok(impresso.includes('.nota-baixa{color:#c0392b'), 'a impressão carrega a cor de nota baixa');
+  ok(impresso.includes('.nota-recuperou{color:#1e8449'), 'e a cor de quem recuperou');
+  ok(impresso.includes('class="nota-recuperou">Recuperou<'), 'e o HTML colado carrega as classes, não só o CSS');
+}
+
 // ===================================================================== 8. limites
 {
   const { doc, app, subirLote } = montarApp();
@@ -767,6 +819,13 @@ function montarApp(opcoes = {}) {
   eq([parada[5], parada[6]], [app.NO_RECOVERY, ''], 'nota igual nos dois bimestres é Não recuperou');
   eq(parada[7], 'Concluído', 'e a linha fica resolvida, não pendente');
 
+  // Reimportar o mesmo Mapão não pode devolver um bimestre fantasma para quem já
+  // ficou Não recuperou: combineRecords sempre sugere um bimestre para linha
+  // nova, e mergeRows tinha que ignorar essa sugestão quando a nota já é sem nota.
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  const paradaDepoisDeReimportar = linha('ALUNA COM TRES PENDENCIAS', 'HISTÓRIA');
+  eq([paradaDepoisDeReimportar[5], paradaDepoisDeReimportar[6]], [app.NO_RECOVERY, ''], 'reimportar o Mapão não traz bimestre de volta');
+
   const subiuPouco = linha('ALUNO COM UMA PENDENCIA', 'MATEMÁTICA');
   eq(subiuPouco[5], '4', 'nota abaixo de 5 também é nota de recuperação');
   eq(app.desfecho(subiuPouco), app.NO_RECOVERY, 'o desfecho responde se alcançou 5,0, não se mudou');
@@ -829,6 +888,26 @@ function montarApp(opcoes = {}) {
   ok(texto.includes('Desfecho'), 'a ATA em Word tem a coluna de desfecho');
   ok(texto.includes('Recuperou'), 'com quem alcançou a média');
   ok(texto.includes('Não recuperou'), 'e quem não alcançou');
+
+  // Cor no Word é a mesma da tela e da impressão: nota abaixo de 5 em vermelho,
+  // Recuperou em verde. O dublê guarda tipo e opções de cada TextRun, então dá
+  // para conferir a cor sem depender do formato OOXML de verdade.
+  const coletarTextRuns = (no, saida = []) => {
+    if (no == null) return saida;
+    if (Array.isArray(no)) { no.forEach(item => coletarTextRuns(item, saida)); return saida; }
+    if (typeof no === 'object') {
+      if (no.tipo === 'TextRun') saida.push(no.opcoes);
+      Object.values(no).forEach(valor => coletarTextRuns(valor, saida));
+    }
+    return saida;
+  };
+  const runs = coletarTextRuns(baixados[baixados.length - 1].doc);
+  const notaBaixaNoWord = runs.find(r => r.text === '4');
+  ok(notaBaixaNoWord && notaBaixaNoWord.color === 'C0392B', 'nota de recuperação abaixo de 5 sai em vermelho no Word');
+  const recuperouNoWord = runs.find(r => r.text === 'Recuperou');
+  ok(recuperouNoWord && recuperouNoWord.color === '1E8449', 'e Recuperou sai em verde no Word');
+  const cabecalhoNoWord = runs.find(r => r.text === 'Aluno');
+  ok(cabecalhoNoWord && cabecalhoNoWord.color === undefined, 'o cabeçalho da tabela não ganha cor');
 }
 
 console.log(`ok — ${checks} verificações de comportamento`);

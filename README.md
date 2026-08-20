@@ -46,7 +46,10 @@ planilha de aluno não pode ser versionada neste repositório.
   no Excel e na ATA.
 - Lote persistido em `localStorage`, com expiração automática em 12 horas e
   botão `Apagar dados`.
-- Exportação para Excel e ATA por turma em `Imprimir / PDF` ou `Baixar Word`.
+- Exportação para Excel e ATA por turma em `Imprimir / PDF`, `Baixar Word` ou
+  `Baixar Excel`.
+- Nota abaixo de 5,0 sai em vermelho na ATA — tela, impressão e Word —, e
+  `Recuperou` sai em verde.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
 - Sala compartilhada por link, quando ligada: duas pessoas lançam nota juntas.
 - Mantém arquivos originais intactos.
