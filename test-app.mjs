@@ -78,17 +78,44 @@ function montarApp(opcoes = {}) {
 
   // Stub do SheetJS. O "arquivo" carrega as linhas em JSON; XLSX.read devolve
   // exatamente o que o SheetJS devolveria: um array de arrays.
+  //
+  // Na gravação o dublê imita a forma de verdade — célula endereçada por A1,
+  // com { v } e o { s } de estilo —, porque é nela que a cor da ATA é escrita.
+  // O array de linhas fica guardado em `linhas` para os testes que só querem
+  // conferir conteúdo. `style_version` é o que o app usa para saber que a
+  // biblioteca em uso escreve cor: com ela presente, carregarXlsxEstilo devolve
+  // esta aqui na hora, sem buscar CDN nenhum.
+  // opcoes.cdnDeCorBloqueada simula a rede da escola barrando o CDN: o jsdom não
+  // busca script externo nem dispara onerror sozinho, então o erro é disparado
+  // aqui, no mesmo ponto em que o navegador dispararia.
+  if (opcoes.cdnDeCorBloqueada) {
+    const appendChild = window.document.head.appendChild.bind(window.document.head);
+    window.document.head.appendChild = (no) => {
+      const resultado = appendChild(no);
+      if (no.tagName === 'SCRIPT' && String(no.src).includes('xlsx-js-style')) setTimeout(() => no.dispatchEvent(new window.Event('error')), 0);
+      return resultado;
+    };
+  }
+
   const escritos = [];
+  const encodeCell = ({ r, c }) => `${String.fromCharCode(65 + c)}${r + 1}`;
   window.XLSX = {
+    style_version: '1.2.0',
     read: (buffer) => ({ SheetNames: ['Sheet1'], Sheets: { Sheet1: JSON.parse(new TextDecoder().decode(buffer)) } }),
     utils: {
       sheet_to_json: (sheet) => sheet,
+      encode_cell: encodeCell,
       book_new: () => ({ SheetNames: [], Sheets: {} }),
-      aoa_to_sheet: (linhas) => linhas,
+      aoa_to_sheet: (linhas) => {
+        const sheet = { linhas };
+        linhas.forEach((linha, r) => linha.forEach((valor, c) => { sheet[encodeCell({ r, c })] = { v: valor }; }));
+        return sheet;
+      },
       book_append_sheet: (book, sheet, nome) => { book.SheetNames.push(nome); book.Sheets[nome] = sheet; },
     },
-    writeFile: (book, nome) => escritos.push({ nome, linhas: book.Sheets[book.SheetNames[0]] }),
+    writeFile: (book, nome) => { const sheet = book.Sheets[book.SheetNames[0]]; escritos.push({ nome, linhas: sheet.linhas, sheet }); },
   };
+  if (opcoes.cdnDeCorBloqueada) delete window.XLSX.style_version;
 
   // A janela de impressão é capturada em vez de aberta.
   const impressos = [];
@@ -594,11 +621,12 @@ function montarApp(opcoes = {}) {
 // Mesmo botão de sempre ao lado de Imprimir / PDF e Baixar Word, mesma lista de
 // alunos que celulasDaAta já entrega para o Word — só muda o formato do arquivo.
 {
-  const { doc, app, subirLote, escritos } = montarApp();
+  const { doc, app, subirLote, escritos, esperar } = montarApp();
   await subirLote([[ARQUIVO_A, TURMA_A], [ARQUIVO_B, TURMA_B]]);
   app.switchView('minutes');
 
   doc.querySelector('#download-ata-excel').click();
+  await esperar();   // a biblioteca de cor é carregada sob demanda: o botão é assíncrono
 
   eq(escritos.length, 1, 'gera um arquivo');
   const nomeEsperado = `ata-${TURMA_A_NOME.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-')}.xlsx`;
@@ -612,9 +640,51 @@ function montarApp(opcoes = {}) {
   // do bimestre é conteúdo e tem que chegar igual nas três saídas.
   eq(semCabecalho.filter(l => l[6] === app.NO_RECOVERY).every(l => l[5] === '-'), true, 'quem não recuperou sai com traço no bimestre');
 
+  // Cor na planilha, mesma regra da tela e do Word. O ARGB do Excel é FF na
+  // frente do hexadecimal, e a célula guarda a cor em s.font.color.rgb.
+  const planilhaAta = escritos[0].sheet;
+  const corDe = (r, c) => planilhaAta[`${String.fromCharCode(65 + c)}${r + 1}`].s?.font?.color?.rgb;
+  const linhaDe = (nome, disciplina) => escritos[0].linhas.findIndex(l => l[0] === nome && l[1] === disciplina);
+  const tresPendencias = linhaDe('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA');
+  ok(tresPendencias > 0, 'a aluna com nota abaixo de 5 está na planilha');
+  eq(corDe(tresPendencias, 2), 'FFC0392B', 'nota do primeiro bimestre abaixo de 5 sai em vermelho no Excel');
+  eq(corDe(tresPendencias, 6), undefined, 'desfecho ainda em branco não ganha cor');
+  eq(planilhaAta.A1.s.font.bold, true, 'o cabeçalho sai em negrito');
+  eq(corDe(0, 6), undefined, 'e sem cor, como no Word');
+  eq(corDe(tresPendencias, 0), undefined, 'nome de aluno nunca ganha cor');
+
+  // Desfecho colorido precisa de nota lançada, que só chega com o Mapão
+  // pós-recuperação: verde em quem recuperou, vermelho em quem não.
+  const comDesfecho = montarApp();
+  await comDesfecho.subirLote([[ARQUIVO_A, TURMA_A]]);
+  await comDesfecho.subirPos([[ARQUIVO_A, TURMA_A_POS]]);
+  comDesfecho.app.switchView('minutes');
+  comDesfecho.doc.querySelector('#download-ata-excel').click();
+  await comDesfecho.esperar();
+  const baixada = comDesfecho.escritos[comDesfecho.escritos.length - 1];
+  const corNaLinha = (nome, disciplina, coluna) => {
+    const r = baixada.linhas.findIndex(l => l[0] === nome && l[1] === disciplina);
+    return baixada.sheet[`${String.fromCharCode(65 + coluna)}${r + 1}`].s?.font?.color?.rgb;
+  };
+  eq(corNaLinha('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA', 6), 'FF1E8449', 'Recuperou sai em verde no Excel');
+  eq(corNaLinha('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA', 4), 'FF1E8449', 'e a nota 7 da recuperação junto');
+  eq(corNaLinha('ALUNA COM TRES PENDENCIAS', 'HISTÓRIA', 6), 'FFC0392B', 'Não recuperou sai em vermelho no Excel');
+
+  // Rede da escola barrando o CDN da cor: a ATA sai igual, sem cor, e o aviso diz.
+  const semCor = montarApp({ cdnDeCorBloqueada: true });
+  await semCor.subirLote([[ARQUIVO_A, TURMA_A]]);
+  semCor.app.switchView('minutes');
+  semCor.doc.querySelector('#download-ata-excel').click();
+  await semCor.esperar();
+  eq(semCor.escritos.length, 1, 'a planilha sai mesmo sem a biblioteca de cor');
+  eq(semCor.escritos[0].linhas[0].length, 7, 'com as mesmas sete colunas');
+  ok(!semCor.escritos[0].sheet.A1.s, 'nenhuma célula sai estilizada');
+  ok(semCor.doc.querySelector('#toast').textContent.includes('sem cor'), 'e o aviso conta por quê');
+
   // Sem lote não há ATA: o botão avisa em vez de baixar arquivo vazio.
   const vazio = montarApp();
   vazio.doc.querySelector('#download-ata-excel').click();
+  await vazio.esperar();
   eq(vazio.escritos.length, 0, 'sem lote não gera arquivo');
   ok(vazio.doc.querySelector('#toast').textContent.includes('Importe um lote'), 'e diz o que fazer');
 }
