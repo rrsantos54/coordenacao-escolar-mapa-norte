@@ -85,12 +85,16 @@ const TRANSFER_RE=/(BAIXA\s+DE\s+TRANSFER|TRANSFERID[OA]|TRANSFER[ÊE]NCIA|MATR[
 // lista quem não tem nenhuma linha ativa na planilha.
 function droppedStudents(rows){const transferred=new Set(),active=new Set();rows.forEach(row=>{const nome=normal(row[0]);if(!nome)return;(TRANSFER_RE.test(row.join(' '))?transferred:active).add(nome)});return new Set([...transferred].filter(nome=>!active.has(nome)))}
 // Lista de componentes que ficam fora da recuperação semestral. Está vazia por
-// opção interna da coordenação: o FAQ 2026, item 6.1, tira Arte, Educação Física,
-// Projeto de Vida e Redação e Leitura, mas a escola decidiu que eles voltam a
-// constar na lista e na ATA. É escolha da escola, mais abrangente que a norma.
-// O filtro fica no lugar. Para voltar ao FAQ, repor o nome normalizado
-// (maiúsculas, sem acento) aqui dentro; nada mais precisa mudar.
-const SEM_PROVA_RECUPERACAO=new Set([]);
+// Componentes fora da Recuperação Semestral por não integrarem a Prova Paulista.
+// Os quatro primeiros são o item 6.1 do FAQ 2026; Tecnologia e Inovação foi
+// incluída pela coordenação em 20/08/2026, pelo mesmo motivo, embora o FAQ não a
+// nomeie. Os demais componentes de itinerário e apoio — Orientação de Estudo,
+// Práticas Experimentais, Robótica, Eletivas, Educação Financeira, Programação,
+// Aprofundamentos, Empreendedorismo, Atualidades — também não estão na Prova
+// Paulista e continuam na lista, porque não houve decisão sobre eles.
+// O nome vai normalizado: maiúsculas e sem acento. A comparação é do nome
+// inteiro, então ESPORTE-MUSICA-ARTE não é pego por ARTE.
+const SEM_PROVA_RECUPERACAO=new Set(['ARTE','ARTES','EDUCACAO FISICA','PROJETO DE VIDA','REDACAO E LEITURA','TECNOLOGIA E INOVACAO']);
 function temProvaDeRecuperacao(disciplina){return !SEM_PROVA_RECUPERACAO.has(normal(disciplina))}
 function subjectPeriod(v,fallback){const match=normal(v).match(/\(([12])B\)/);return match?`${match[1]}º`:fallback}
 function findTurma(rows,fileName){for(const row of rows){for(let i=0;i<row.length;i++){if(normal(row[i])==='TURMA:'||normal(row[i])==='TURMA'){const value=row.slice(i+1).find(v=>String(v??'').trim());if(value)return cleanClassName(value)}}}const fallback=rows.flat().map(v=>String(v??'').trim()).find(v=>TURMA_RE.test(v));if(fallback)return cleanClassName(fallback);const fromName=String(fileName).replace(/\.(xlsx|xls)$/i,'').match(TURMA_NOME_RE);return fromName?cleanClassName(fromName[0]):'Turma não identificada'}

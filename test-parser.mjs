@@ -164,10 +164,10 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
 
 // ------------------------------------------------ componentes sem prova (lista)
 {
-  // Arte, Educação Física, Projeto de Vida e Redação e Leitura voltaram a constar
-  // por opção interna da coordenação, mais abrangente que o item 6.1 do FAQ.
-  for (const d of ['ARTE', 'Arte', 'EDUCACAO FISICA', 'Educação Física', 'PROJETO DE VIDA', 'REDAÇAO E LEITURA', 'Redação e Leitura']) {
-    eq(temProvaDeRecuperacao(d), true, `devia voltar a constar: ${d}`);
+  // Item 6.1 do FAQ 2026: não integram a Prova Paulista, então não têm
+  // recuperação semestral. Tecnologia e Inovação entrou junto em 20/08/2026.
+  for (const d of ['ARTE', 'Arte', 'EDUCACAO FISICA', 'Educação Física', 'PROJETO DE VIDA', 'REDAÇAO E LEITURA', 'Redação e Leitura', 'TECNOLOGIA E INOVACAO', 'Tecnologia e Inovação']) {
+    eq(temProvaDeRecuperacao(d), false, `não tem recuperação: ${d}`);
   }
   for (const d of ['MATEMATICA', 'LINGUA PORTUGUESA', 'HISTORIA', 'GEOGRAFIA', 'CIENCIAS', 'BIOLOGIA', 'FISICA', 'QUIMICA', 'FILOSOFIA', 'SOCIOLOGIA', 'LINGUA INGLESA']) {
     eq(temProvaDeRecuperacao(d), true, `devia entrar: ${d}`);
@@ -175,14 +175,13 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   for (const d of ['ORIENTAÇAO DE ESTUDO - MATEMATICA', 'PRATICAS EXPERIMENTAIS', 'ROBOTICA', 'ELETIVAS']) {
     eq(temProvaDeRecuperacao(d), true, `não é para excluir: ${d}`);
   }
-  // O filtro continua funcionando: quem entrar na lista sai da recuperação, e a
-  // comparação é do nome inteiro, não por trecho — ESPORTE-MUSICA-ARTE termina
-  // em ARTE e não pode ser pego por uma exclusão de ARTE.
-  SEM_PROVA_RECUPERACAO.add('ARTE');
-  eq(temProvaDeRecuperacao('Arte'), false, 'nome na lista fica fora');
+  // A comparação é do nome inteiro, não por trecho: ESPORTE-MUSICA-ARTE termina
+  // em ARTE e não pode ser pego pela exclusão de ARTE. No lote real esse
+  // componente nunca chega aqui — 339 das 356 notas são conceito, não número —
+  // mas a exclusão por trecho quebraria a turma que tivesse nota.
   eq(temProvaDeRecuperacao('ESPORTE-MUSICA-ARTE'), true, 'comparação é exata, não por trecho');
-  SEM_PROVA_RECUPERACAO.delete('ARTE');
-  eq(temProvaDeRecuperacao('Arte'), true, 'lista volta a ficar vazia');
+  eq(temProvaDeRecuperacao('ESPORTE-MÚSICA-ARTE'), true, 'nem com acento');
+  eq(temProvaDeRecuperacao('ARTES VISUAIS'), true, 'nem por prefixo');
 }
 
 // ------------------------------------------------------------------ nota crua
@@ -217,12 +216,10 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   const mantidos = keepRecords(parsed.records, rows);
   const chaves = mantidos.map(r => `${r.aluno}|${r.disciplina}|${r.bimestre}`).sort();
   eq(chaves, [
-    'ANA CLARA DE SOUZA|ARTE|1º',
-    'ANA CLARA DE SOUZA|ARTE|2º',
     'ANA CLARA DE SOUZA|MATEMÁTICA|1º',
     'ANA CLARA DE SOUZA|MATEMÁTICA|2º',
     'CARLA DIAS MOTA|HISTÓRIA|1º',
-  ], 'toda nota abaixo de 5 de aluno ativo, Arte incluída');
+  ], 'nota abaixo de 5 de aluno ativo, sem Arte: não integra a Prova Paulista');
 
   const linhas = combineRecords(mantidos);
   const ana = linhas.find(l => l[0] === 'ANA CLARA DE SOUZA');
