@@ -652,6 +652,10 @@ function montarApp(opcoes = {}) {
   eq(planilhaAta.A1.s.font.bold, true, 'o cabeçalho sai em negrito');
   eq(corDe(0, 6), undefined, 'e sem cor, como no Word');
   eq(corDe(tresPendencias, 0), undefined, 'nome de aluno nunca ganha cor');
+  const alinhamentoEm = (r, c) => planilhaAta[`${String.fromCharCode(65 + c)}${r + 1}`].s?.alignment?.horizontal;
+  eq(alinhamentoEm(tresPendencias, 2), 'center', 'a nota sai centralizada no Excel');
+  eq(alinhamentoEm(0, 4), 'center', 'o cabeçalho da coluna de nota acompanha');
+  eq(alinhamentoEm(tresPendencias, 0), undefined, 'e o nome do aluno não');
 
   // Desfecho colorido precisa de nota lançada, que só chega com o Mapão
   // pós-recuperação: verde em quem recuperou, vermelho em quem não.
@@ -701,14 +705,14 @@ function montarApp(opcoes = {}) {
   app.renderAta(TURMA_A_NOME);
 
   const paper = doc.querySelector('.paper-table').innerHTML;
-  ok(paper.includes('class="nota-baixa">3<'), 'nota do primeiro bimestre abaixo de 5 sai em vermelho na tela');
-  ok(paper.includes('class="nota-baixa">4<'), 'nota de recuperação abaixo de 5 (quem não recuperou) também sai em vermelho');
+  ok(paper.includes('class="nota-baixa nota-centro">3<'), 'nota do primeiro bimestre abaixo de 5 sai em vermelho na tela, e centralizada');
+  ok(paper.includes('class="nota-baixa nota-centro">4<'), 'nota de recuperação abaixo de 5 (quem não recuperou) também sai em vermelho');
   ok(paper.includes('class="nota-recuperou">Recuperou<'), 'quem recuperou sai em verde');
   ok(!/class="nota-baixa">Recuperou</.test(paper), 'Recuperou nunca sai como nota baixa');
-  ok(paper.includes('class="nota-recuperou">7<'), 'nota de recuperação a partir de 5 sai em verde');
+  ok(paper.includes('class="nota-recuperou nota-centro">7<'), 'nota de recuperação a partir de 5 sai em verde');
   ok(paper.includes(`class="nota-baixa">${app.NO_RECOVERY}<`), 'Não recuperou sai em vermelho');
   // Quem não recuperou não substitui bimestre nenhum: traço, não lacuna a preencher.
-  ok(paper.includes('<span>-</span>'), 'o bimestre de quem não recuperou sai com traço');
+  ok(paper.includes('<span>-</span>'), 'o bimestre de quem não recuperou sai com traço, e sem classe: só as notas são centralizadas');
   ok(paper.includes('<span>1º bimestre</span>'), 'e quem recuperou continua mostrando o bimestre substituído');
   eq((paper.match(/<span>-<\/span>/g) || []).length, 2, 'os dois que não recuperaram saem com traço, inclusive o que tinha bimestre sugerido pelo Mapão');
 
@@ -718,6 +722,8 @@ function montarApp(opcoes = {}) {
   const impresso = impressos[impressos.length - 1];
   ok(impresso.includes('.nota-baixa{color:#c0392b'), 'a impressão carrega a cor de nota baixa');
   ok(impresso.includes('.nota-recuperou{color:#1e8449'), 'e a cor de quem recuperou');
+  ok(impresso.includes('.nota-centro{text-align:center'), 'e o alinhamento das notas: a janela de impressão não carrega o styles.css');
+  ok(impresso.includes('class="nota-baixa nota-centro">3<'), 'com as duas classes no HTML colado');
   ok(impresso.includes('class="nota-recuperou">Recuperou<'), 'e o HTML colado carrega as classes, não só o CSS');
 }
 
@@ -992,6 +998,27 @@ function montarApp(opcoes = {}) {
   ok(runs.some(r => r.text === '-' && r.color === undefined), 'o traço do bimestre não recuperado fica sem cor');
   const cabecalhoNoWord = runs.find(r => r.text === 'Aluno');
   ok(cabecalhoNoWord && cabecalhoNoWord.color === undefined, 'o cabeçalho da tabela não ganha cor');
+
+  // Centralização é do parágrafo, não do TextRun: a célula de nota da tabela
+  // carrega alignment CENTER, e a de aluno não carrega nada.
+  const celulasDaTabela = (no, saida = []) => {
+    if (no == null) return saida;
+    if (Array.isArray(no)) { no.forEach(item => celulasDaTabela(item, saida)); return saida; }
+    if (typeof no === 'object') {
+      if (no.tipo === 'TableCell') saida.push(no.opcoes);
+      Object.values(no).forEach(valor => celulasDaTabela(valor, saida));
+    }
+    return saida;
+  };
+  const textoDaCelula = (celula) => celula.children?.[0]?.opcoes?.children?.[0]?.opcoes?.text;
+  const alinhamentoDe = (texto) => {
+    const celula = celulasDaTabela(baixados[baixados.length - 1].doc).find(c => textoDaCelula(c) === texto);
+    return celula?.children?.[0]?.opcoes?.alignment;
+  };
+  eq(alinhamentoDe('7'), 'center', 'a nota sai centralizada no Word');
+  eq(alinhamentoDe('ALUNA COM TRES PENDENCIAS'), undefined, 'o nome do aluno não');
+  eq(alinhamentoDe('Recuperou'), undefined, 'o desfecho também não');
+  eq(alinhamentoDe('Nota da recuperação semestral'), 'center', 'e o cabeçalho da coluna de nota acompanha');
 }
 
 console.log(`ok — ${checks} verificações de comportamento`);

@@ -57,9 +57,12 @@ const PUROS = [
   /^const SALA_ALFABETO=.*$/m,
   /^function novaSala\(sorteio=.*$/m,
   /^const ATA_COLUNAS=.*$/m,
+  /^const COLUNAS_DE_NOTA=.*$/m,
+  /^function notaCentralizada\(coluna\).*$/m,
   /^function notaBaixa\(v\).*$/m,
   /^function notaAlta\(v\).*$/m,
   /^function classeDaCelula\(coluna,valor\).*$/m,
+  /^function classesDaCelula\(coluna,valor\).*$/m,
   /^function bimestreDaAta\(row\).*$/m,
   /^function celulasDaAta\(rows\).*$/m,
   /^function nomeDoArquivoAta\(className,ext='docx'\).*$/m,
@@ -72,7 +75,7 @@ const EXPORTA = [
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
-  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -84,7 +87,7 @@ const {
   parseExport, notaRecuperacao, bimestreSubstituido,
   NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
-  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula,
 } = api;
 
 let checks = 0;
@@ -826,6 +829,15 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   eq(classeDaCelula(4, NO_EXAM), '', 'Não realizou continua sem cor em qualquer coluna');
   eq(classeDaCelula(0, '4'), '', 'nome de aluno nunca ganha cor');
   eq(classeDaCelula(5, '1º bimestre'), '', 'bimestre substituído nunca ganha cor');
+
+  // As três colunas de nota saem centralizadas, e a cor vai junto no mesmo
+  // atributo. Aluno, disciplina, bimestre e desfecho seguem alinhados à esquerda.
+  eq(classesDaCelula(2, '4'), 'nota-baixa nota-centro', 'nota abaixo de 5 sai vermelha e centralizada');
+  eq(classesDaCelula(4, '7'), 'nota-recuperou nota-centro', 'nota a partir de 5 sai verde e centralizada');
+  eq(classesDaCelula(3, '____'), 'nota-centro', 'lacuna de nota é centralizada mesmo sem cor');
+  eq(classesDaCelula(0, 'ALUNA'), '', 'nome de aluno não é centralizado');
+  eq(classesDaCelula(5, '-'), '', 'o traço do bimestre não é centralizado');
+  eq(classesDaCelula(6, 'Recuperou'), 'nota-recuperou', 'o desfecho tem cor, não centralização');
 }
 
 
