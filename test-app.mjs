@@ -169,6 +169,9 @@ function montarApp(opcoes = {}) {
     Table: criarClasse('Table'), TableRow: criarClasse('TableRow'), TableCell: criarClasse('TableCell'),
     ImageRun: criarClasse('ImageRun'),
     AlignmentType: { CENTER: 'center' }, WidthType: { PERCENTAGE: 'pct' }, BorderStyle: { NONE: 'none' },
+    // Conferidos contra o docx 9.7.1 de verdade: geram <w:vMerge w:val="…"> e
+    // <w:vAlign w:val="center"> no OOXML.
+    VerticalMergeType: { RESTART: 'restart', CONTINUE: 'continue' }, VerticalAlign: { CENTER: 'center' },
     Packer: { toBlob: async (doc) => { baixados.push({ doc }); return new window.Blob(['docx']); } },
   };
   // jsdom não implementa nenhum dos dois.
@@ -644,9 +647,12 @@ function montarApp(opcoes = {}) {
   // frente do hexadecimal, e a célula guarda a cor em s.font.color.rgb.
   const planilhaAta = escritos[0].sheet;
   const corDe = (r, c) => planilhaAta[`${String.fromCharCode(65 + c)}${r + 1}`].s?.font?.color?.rgb;
-  const linhaDe = (nome, disciplina) => escritos[0].linhas.findIndex(l => l[0] === nome && l[1] === disciplina);
-  const tresPendencias = linhaDe('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA');
+  // A busca é pela disciplina: o nome do aluno agora sai só na primeira linha
+  // do bloco, e as seguintes vêm vazias porque a célula é mesclada.
+  const linhaDe = (disciplina) => escritos[0].linhas.findIndex(l => l[1] === disciplina);
+  const tresPendencias = linhaDe('MATEMÁTICA');
   ok(tresPendencias > 0, 'a aluna com nota abaixo de 5 está na planilha');
+  eq(escritos[0].linhas[tresPendencias][0], 'ALUNA COM TRES PENDENCIAS', 'com o nome na primeira linha do bloco');
   eq(corDe(tresPendencias, 2), 'FFC0392B', 'nota do primeiro bimestre abaixo de 5 sai em vermelho no Excel');
   eq(corDe(tresPendencias, 6), undefined, 'desfecho ainda em branco não ganha cor');
   eq(planilhaAta.A1.s.font.bold, true, 'o cabeçalho sai em negrito');
@@ -657,6 +663,22 @@ function montarApp(opcoes = {}) {
   eq(alinhamentoEm(0, 4), 'center', 'o cabeçalho da coluna de nota acompanha');
   eq(alinhamentoEm(tresPendencias, 0), undefined, 'e o nome do aluno não');
 
+  // Nome uma vez por bloco: a aluna com três componentes ocupa três linhas, o
+  // nome fica só na primeira e a coluna A é mesclada nas três.
+  // Comparado como texto de propósito: o array vem do realm do jsdom, e
+  // deepStrictEqual compara protótipo antes de conteúdo.
+  const nomesDoBloco = escritos[0].linhas.slice(tresPendencias, tresPendencias + 3).map(l => l[0]).join('|');
+  eq(nomesDoBloco, 'ALUNA COM TRES PENDENCIAS||', 'o nome sai uma vez e as linhas seguintes vêm vazias');
+  // tresPendencias é o índice na lista com cabeçalho, que é o mesmo número da
+  // linha 0-based do SheetJS: cabeçalho em 0, primeira linha de dado em 1.
+  const mesclagem = planilhaAta['!merges'].find(m => m.s.r === tresPendencias);
+  ok(mesclagem, 'a coluna A é mesclada no bloco da aluna');
+  eq(`${mesclagem.s.c}-${mesclagem.e.c}`, '0-0', 'a mesclagem é só da coluna do aluno');
+  eq(mesclagem.e.r - mesclagem.s.r + 1, 3, 'e cobre as três linhas do bloco');
+  ok(!planilhaAta['!merges'].some(m => m.e.r === m.s.r), 'aluno de um componente só não gera mesclagem');
+  eq(planilhaAta['!cols'].length, 7, 'as sete colunas têm largura definida');
+  ok(planilhaAta['!cols'][0].wch > planilhaAta['!cols'][2].wch, 'a coluna do aluno é mais larga que a de nota');
+
   // Desfecho colorido precisa de nota lançada, que só chega com o Mapão
   // pós-recuperação: verde em quem recuperou, vermelho em quem não.
   const comDesfecho = montarApp();
@@ -666,13 +688,13 @@ function montarApp(opcoes = {}) {
   comDesfecho.doc.querySelector('#download-ata-excel').click();
   await comDesfecho.esperar();
   const baixada = comDesfecho.escritos[comDesfecho.escritos.length - 1];
-  const corNaLinha = (nome, disciplina, coluna) => {
-    const r = baixada.linhas.findIndex(l => l[0] === nome && l[1] === disciplina);
+  const corNaLinha = (disciplina, coluna) => {
+    const r = baixada.linhas.findIndex(l => l[1] === disciplina);
     return baixada.sheet[`${String.fromCharCode(65 + coluna)}${r + 1}`].s?.font?.color?.rgb;
   };
-  eq(corNaLinha('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA', 6), 'FF1E8449', 'Recuperou sai em verde no Excel');
-  eq(corNaLinha('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA', 4), 'FF1E8449', 'e a nota 7 da recuperação junto');
-  eq(corNaLinha('ALUNA COM TRES PENDENCIAS', 'HISTÓRIA', 6), 'FFC0392B', 'Não recuperou sai em vermelho no Excel');
+  eq(corNaLinha('MATEMÁTICA', 6), 'FF1E8449', 'Recuperou sai em verde no Excel');
+  eq(corNaLinha('MATEMÁTICA', 4), 'FF1E8449', 'e a nota 7 da recuperação junto');
+  eq(corNaLinha('HISTÓRIA', 6), 'FFC0392B', 'Não recuperou sai em vermelho no Excel');
 
   // Rede da escola barrando o CDN da cor: a ATA sai igual, sem cor, e o aviso diz.
   const semCor = montarApp({ cdnDeCorBloqueada: true });
@@ -712,9 +734,18 @@ function montarApp(opcoes = {}) {
   ok(paper.includes('class="nota-recuperou nota-centro">7<'), 'nota de recuperação a partir de 5 sai em verde');
   ok(paper.includes(`class="nota-baixa">${app.NO_RECOVERY}<`), 'Não recuperou sai em vermelho');
   // Quem não recuperou não substitui bimestre nenhum: traço, não lacuna a preencher.
-  ok(paper.includes('<span>-</span>'), 'o bimestre de quem não recuperou sai com traço, e sem classe: só as notas são centralizadas');
-  ok(paper.includes('<span>1º bimestre</span>'), 'e quem recuperou continua mostrando o bimestre substituído');
-  eq((paper.match(/<span>-<\/span>/g) || []).length, 2, 'os dois que não recuperaram saem com traço, inclusive o que tinha bimestre sugerido pelo Mapão');
+  ok(paper.includes('class="nota-centro">-</span>'), 'o bimestre de quem não recuperou sai com traço, centralizado');
+  ok(paper.includes('class="nota-centro">1º bimestre</span>'), 'e quem recuperou continua mostrando o bimestre substituído, centralizado');
+  eq((paper.match(/class="nota-centro">-<\/span>/g) || []).length, 2, 'os dois que não recuperaram saem com traço, inclusive o que tinha bimestre sugerido pelo Mapão');
+
+  // A aluna com três componentes: o nome aparece uma vez, e as duas células
+  // seguintes ficam vazias e sem borda de baixo, que é o que dá o efeito de
+  // célula mesclada numa grade de CSS.
+  eq((paper.match(/ALUNA COM TRES PENDENCIAS/g) || []).length, 1, 'o nome do aluno aparece uma vez só, mesmo com três componentes');
+  ok(paper.includes('<span class="aluno aluno-mesclado">ALUNA COM TRES PENDENCIAS</span>'), 'a primeira linha do bloco leva o nome e perde a borda de baixo');
+  eq((paper.match(/<span class="aluno[^"]*"><\/span>/g) || []).length, 2, 'as duas linhas seguintes trazem a célula do aluno vazia');
+  ok(paper.includes('<span class="aluno"></span>'), 'e a última do bloco recupera a borda, que fecha a mesclagem');
+  ok(paper.includes('<span class="aluno">ALUNO COM UMA PENDENCIA</span>'), 'quem tem um componente só não vira bloco mesclado');
 
   // A janela de impressão não carrega o styles.css: as duas regras têm que ir
   // no <style> que printAta escreve, senão a cor não aparece no PDF impresso.
@@ -724,6 +755,9 @@ function montarApp(opcoes = {}) {
   ok(impresso.includes('.nota-recuperou{color:#1e8449'), 'e a cor de quem recuperou');
   ok(impresso.includes('.nota-centro{text-align:center'), 'e o alinhamento das notas: a janela de impressão não carrega o styles.css');
   ok(impresso.includes('class="nota-baixa nota-centro">3<'), 'com as duas classes no HTML colado');
+  ok(impresso.includes('.aluno{white-space:nowrap'), 'o nome do aluno não quebra linha na impressão');
+  ok(impresso.includes('.aluno-mesclado{border-bottom:none'), 'e a célula mesclada não leva borda');
+  ok(impresso.includes('grid-template-columns:minmax(max-content,2.6fr)'), 'a grade da impressão é a mesma da tela');
   ok(impresso.includes('class="nota-recuperou">Recuperou<'), 'e o HTML colado carrega as classes, não só o CSS');
 }
 
@@ -1019,6 +1053,25 @@ function montarApp(opcoes = {}) {
   eq(alinhamentoDe('ALUNA COM TRES PENDENCIAS'), undefined, 'o nome do aluno não');
   eq(alinhamentoDe('Recuperou'), undefined, 'o desfecho também não');
   eq(alinhamentoDe('Nota da recuperação semestral'), 'center', 'e o cabeçalho da coluna de nota acompanha');
+
+  // Mesclagem vertical no Word: a primeira célula do bloco é RESTART e leva o
+  // nome; as seguintes são CONTINUE e vão vazias. O Word junta as três.
+  const celulas = celulasDaTabela(baixados[baixados.length - 1].doc);
+  const daAluna = celulas.filter(c => c.verticalMerge);
+  const restart = daAluna.filter(c => c.verticalMerge === 'restart');
+  const continua = daAluna.filter(c => c.verticalMerge === 'continue');
+  ok(restart.length >= 1, 'há bloco começando com RESTART');
+  eq(restart.length + continua.length, daAluna.length, 'toda célula de aluno é RESTART ou CONTINUE');
+  ok(restart.every(c => textoDaCelula(c) !== ''), 'a célula que abre o bloco leva o nome');
+  ok(continua.every(c => textoDaCelula(c) === ''), 'e as que continuam vão vazias');
+  eq(continua.length, 2, 'a aluna com três componentes gera duas continuações');
+  ok(restart.every(c => c.verticalAlign === 'center'), 'o nome fica no meio do bloco mesclado');
+  ok(!celulas.filter(c => textoDaCelula(c) === 'Aluno').some(c => c.verticalMerge), 'o cabeçalho não entra na mesclagem');
+
+  // Larguras: a tabela declara as sete colunas, e a do aluno é a mais larga.
+  const tabelaDoWord = baixados[baixados.length - 1].doc.opcoes.sections[0].children.find(f => f.tipo === 'Table');
+  eq(tabelaDoWord.opcoes.columnWidths.length, 7, 'sete larguras declaradas');
+  ok(tabelaDoWord.opcoes.columnWidths[0] > tabelaDoWord.opcoes.columnWidths[2], 'a coluna do aluno é mais larga que a de nota');
 }
 
 console.log(`ok — ${checks} verificações de comportamento`);
