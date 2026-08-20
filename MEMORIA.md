@@ -381,17 +381,24 @@ colunas, e mostrar o nome uma vez só para quem ficou em vários componentes.
 mesmo aluno e devolve o tamanho na primeira linha do bloco, com 0 nas demais.
 Cada saída mescla do seu jeito, mas todas perguntam a mesma coisa:
 
-- **Tela e impressão**: uma grade de CSS não mescla célula. O efeito vem de
-  duas coisas — a célula das linhas seguintes sai vazia, e a de cima perde a
-  `border-bottom` (classe `aluno-mesclado`). A última linha do bloco mantém a
-  borda, que é o que fecha o desenho.
+- **Tela e impressão**: a primeira versão simulava a mesclagem com célula vazia
+  e sem `border-bottom`. Funcionava de longe, mas o nome ficava colado no topo
+  do bloco, e não havia como centralizá-lo: cada célula ocupava uma linha só.
+  A versão que ficou usa mesclagem de verdade — `grid-row: span N` na célula do
+  aluno, e nenhuma célula nas linhas seguintes. Com a célula ocupando o bloco
+  inteiro, `display:flex; align-items:center` põe o nome no meio. O
+  posicionamento automático da grade cuida do resto: as outras colunas fluem
+  para a linha seguinte pulando a coluna já ocupada.
 - **Word**: `verticalMerge` com `VerticalMergeType.RESTART` na primeira e
   `CONTINUE` nas seguintes, mais `verticalAlign: CENTER` para o nome ficar no
   meio do bloco. Conferido contra o docx 9.7.1 de verdade antes de escrever o
   código: gera `<w:vMerge w:val="restart">` e `<w:vAlign w:val="center">`.
 - **Excel**: `sheet['!merges']` com um intervalo por bloco de mais de uma
   linha, e o nome apagado das linhas seguintes. Também conferido no arquivo
-  gerado: sai `<mergeCell ref="A2:A3"/>`.
+  gerado: sai `<mergeCell ref="A2:A3"/>`. Célula mesclada no Excel alinha
+  embaixo por padrão, então a coluna do aluno leva `alignment.vertical` de
+  propósito — sem isso o nome desceria para a última linha do bloco, diferente
+  do Word e da tela.
 
 Só sequência é agrupada. Aluno que aparecer em dois trechos separados vira dois
 blocos — o certo a fazer quando a ordem das linhas não os deixou juntos.
