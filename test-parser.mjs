@@ -15,6 +15,8 @@ const grab = re => {
 
 const PUROS = [
   /const NO_EXAM='[^']*';/,
+  /^const NO_RECOVERY=.*$/m,
+  /^function semNota\(valor\).*$/m,
   /^function normal\(v\).*$/m,
   /^const SCHOOL_TITLES=.*$/m,
   /^function normalizeSchoolName\(name\).*$/m,
@@ -32,12 +34,16 @@ const PUROS = [
   /^function findTurma\(rows,fileName\).*$/m,
   /^function bimester\(name,metadata=\[\]\).*$/m,
   /^function parseNumber\(v\).*$/m,
-  /^function parseSheet\(rows,fileName\).*$/m,
+  /^function parseSheet\(rows,fileName,todasAsNotas=false\).*$/m,
   /^const SCHOOL_LABELS=.*$/m,
   /^function detectSchool\(rows\).*$/m,
   /^function keepRecords\(records,rows\).*$/m,
   /^function combineRecords\(records\).*$/m,
   /^function rowStatus\(row\).*$/m,
+  /^function desfecho\(row\).*$/m,
+  /^function chavePosRecuperacao\(aluno,turma,disciplina\).*$/m,
+  /^function notasPosRecuperacao\(registros\).*$/m,
+  /^function aplicarPosRecuperacao\(linhas,registros\).*$/m,
   /^function mergeRows\(previous,incoming\).*$/m,
   /^function notaBimestre\(v\).*$/m,
   /^function notaRecuperacao\(v\).*$/m,
@@ -60,6 +66,7 @@ const EXPORTA = [
   'droppedStudents', 'SEM_PROVA_RECUPERACAO', 'temProvaDeRecuperacao', 'parseSheet', 'detectSchool',
   'keepRecords', 'combineRecords', 'mergeRows', 'bimester', 'parseNumber', 'rowStatus',
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
+  'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
   'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS',
 ];
@@ -71,6 +78,7 @@ const {
   droppedStudents, SEM_PROVA_RECUPERACAO, temProvaDeRecuperacao, parseSheet, detectSchool,
   keepRecords, combineRecords, mergeRows, bimester, parseNumber, rowStatus,
   parseExport, notaRecuperacao, bimestreSubstituido,
+  NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
   celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS,
 } = api;
@@ -468,13 +476,13 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   const celulas = celulasDaAta([linha]);
 
   eq(celulas[0], ATA_COLUNAS, 'a primeira linha é o cabeçalho');
-  eq(celulas[0].length, 6, 'seis colunas, como a ATA da tela');
-  eq(celulas[1], ['FULANA DE TAL', 'MATEMATICA', '3', '4', '7', '1º bimestre'], 'a turma não vira coluna: ela já é o título da ATA');
+  eq(celulas[0].length, 7, 'sete colunas, como a ATA da tela');
+  eq(celulas[1], ['FULANA DE TAL', 'MATEMATICA', '3', '4', '7', '1º bimestre', 'Recuperou'], 'a turma não vira coluna: ela já é o título da ATA');
   eq(celulas[1].length, celulas[0].length, 'linha e cabeçalho com a mesma largura');
 
   // Sem nota lançada, a ATA sai com a lacuna para preencher à mão.
   const pendente = celulasDaAta([['ALUNO', 'T', 'HISTORIA', '2', '—', '—', '', 'Pendente']])[1];
-  eq(pendente, ['ALUNO', 'HISTORIA', '2', '—', '____', '____'], 'nota e bimestre vazios viram lacuna');
+  eq(pendente, ['ALUNO', 'HISTORIA', '2', '—', '____', '____', '____'], 'nota, bimestre e desfecho vazios viram lacuna');
 
   // Não realizou é informação, não lacuna: tem que aparecer escrito.
   eq(celulasDaAta([['ALUNO', 'T', 'HISTORIA', '2', '3', 'Não realizou', '', 'Concluído']])[1][4], 'Não realizou', 'Não realizou aparece escrito na ATA');
@@ -548,5 +556,186 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
     }
   }
 }
+
+// ============================================ Mapão pós-recuperação
+// A nota da recuperação semestral voltou sobrescrita na célula do bimestre, sem
+// coluna própria. Tudo aqui é a comparação entre o que está na tela e o Mapão
+// novo — a única fonte da nota, agora.
+
+// ------------------------------------------- leitura com todas as notas
+{
+  const rows = [
+    ['ALUNO', 'SITUAÇÃO', 'MATEMATICA (1B)', 'MATEMATICA (2B)'],
+    ['ANA CLARA DE SOUZA', 'Ativo', '3', '8'],
+  ];
+  const nome = 'Mapao_Consolidado_6° ANO A INTEGRAL 9H ANUAL.xlsx';
+
+  const comoSempre = parseSheet(rows, nome);
+  eq(comoSempre.records.map(r => `${r.bimestre}:${r.nota}`), ['1º:3'],
+     'sem o parâmetro, parseSheet entrega o que sempre entregou: só abaixo de 5');
+
+  const tudo = parseSheet(rows, nome, true);
+  eq(tudo.records.map(r => `${r.bimestre}:${r.nota}`).sort(), ['1º:3', '2º:8'],
+     'com todasAsNotas, quem recuperou também vem — é justamente essa a nota que falta');
+
+  // Conceito continua fora: ES, ET e EP não são número e nunca viraram nota.
+  const conceitos = parseSheet([
+    ['ALUNO', 'SITUAÇÃO', 'ESPORTE-MUSICA-ARTE (1B)'],
+    ['ANA CLARA DE SOUZA', 'Ativo', 'ES'],
+  ], nome, true);
+  eq(conceitos.records, [], 'conceito não vira nota nem com todasAsNotas');
+}
+
+// ------------------------------------------------------- a tabela do diff
+{
+  // Linha da tela: aluno, turma, disciplina, 1º, 2º, nota rec, bimestre, status.
+  const linha = (nota1, nota2, rec = '—', bim = '1º bimestre') =>
+    ['ANA CLARA DE SOUZA', '6° ANO A', 'MATEMÁTICA', nota1, nota2, rec, bim, 'Pendente'];
+  const mapao = (n1, n2) => [
+    ...(n1 === null ? [] : [{ aluno: 'ANA CLARA DE SOUZA', turma: '6° ANO A', disciplina: 'MATEMÁTICA', bimestre: '1º', nota: n1 }]),
+    ...(n2 === null ? [] : [{ aluno: 'ANA CLARA DE SOUZA', turma: '6° ANO A', disciplina: 'MATEMÁTICA', bimestre: '2º', nota: n2 }]),
+  ];
+
+  // Um bimestre candidato subiu: é a nota da recuperação, e é o bimestre substituído.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4')], mapao(3, 7));
+    eq([r.linhas[0][5], r.linhas[0][6]], ['7', '2º bimestre'], 'o bimestre que subiu é o substituído');
+    eq(r.linhas[0][7], 'Concluído', 'linha resolvida');
+    eq([r.preenchidas, r.naoRecuperou, r.divergencias.length], [1, 0, 0], 'uma linha preenchida');
+  }
+
+  // Nenhum mudou: fez e não alcançou, ou faltou. O diff não separa os dois, e a
+  // coordenação decidiu que ambos são Não recuperou.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4')], mapao(3, 4));
+    eq([r.linhas[0][5], r.linhas[0][6]], [NO_RECOVERY, ''], 'nada mudou, ninguém recuperou');
+    eq(r.linhas[0][7], 'Concluído', 'Não recuperou fecha a linha, como Não realizou');
+    eq([r.preenchidas, r.naoRecuperou], [0, 1], 'contado como não recuperou');
+  }
+
+  // Subiu mas continuou abaixo de 5: a nota entra e o bimestre é substituído.
+  // O desfecho é que responde "alcançou 5,0?".
+  {
+    const r = aplicarPosRecuperacao([linha('2', '4')], mapao(4, 4));
+    eq([r.linhas[0][5], r.linhas[0][6]], ['4', '1º bimestre'], 'nota abaixo de 5 também é nota de recuperação');
+    eq(desfecho(r.linhas[0]), NO_RECOVERY, 'subiu, mas não alcançou média');
+  }
+
+  // Os dois bimestres mudaram: o item 7.3 do FAQ diz que só um é alterado.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4')], mapao(6, 7));
+    eq(r.linhas[0][5], '—', 'nada é aplicado');
+    eq(r.divergencias.map(d => d.motivo), ['os dois bimestres mudaram'], 'vira divergência');
+  }
+
+  // Nota caiu.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4')], mapao(3, 2));
+    eq(r.linhas[0][5], '—', 'nota que cai não é aplicada');
+    eq(r.divergencias.length, 1, 'e é divergência');
+  }
+
+  // Nota quebrada. O Mapão real manda inteiro; arredondar seria mexer em nota de
+  // aluno em documento oficial.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4')], mapao(3, 6.5));
+    eq(r.linhas[0][5], '—', 'decimal não é arredondado');
+    eq(r.divergencias.map(d => d.motivo), ['nota não inteira no Mapão pós-recuperação'], 'decimal vira divergência');
+  }
+
+  // Linha que sumiu do Mapão novo.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4')], []);
+    eq(r.linhas[0][5], '—', 'linha ausente fica como estava');
+    eq(r.divergencias.map(d => d.motivo), ['linha não encontrada no Mapão pós-recuperação'], 'ausência é divergência');
+  }
+
+  // Bimestre que não estava em recuperação é ruído: '—' quer dizer que a nota era
+  // 5,0 ou mais. Mudança ali não pode ser lida como nota de recuperação.
+  {
+    const r = aplicarPosRecuperacao([linha('—', '4')], mapao(9, 4));
+    eq([r.linhas[0][5], r.linhas[0][6]], [NO_RECOVERY, ''], 'o 1º bimestre não é candidato, então nada mudou');
+  }
+  {
+    const r = aplicarPosRecuperacao([linha('—', '4')], mapao(9, 8));
+    eq([r.linhas[0][5], r.linhas[0][6]], ['8', '2º bimestre'], 'só o candidato conta, e ele subiu');
+  }
+
+  // Já preenchida à mão e o Mapão discorda: o Mapão vence, e a divergência fica
+  // visível — o valor oficial entra, e o conflito não some.
+  {
+    const r = aplicarPosRecuperacao([linha('3', '4', '5', '1º bimestre')], mapao(3, 7));
+    eq(r.linhas[0][5], '7', 'o Mapão vence a digitação manual');
+    eq(r.divergencias.length, 1, 'o conflito continua visível');
+    ok(/o Mapão diz 7 e a lista tinha 5/.test(r.divergencias[0].motivo), 'a divergência diz os dois valores');
+  }
+
+  // Acento e caixa não separam a mesma linha: a chave passa por normal().
+  {
+    const linhas = [['ANA CLARA DE SOUZA', '6° ANO A', 'MATEMÁTICA', '3', '—', '—', '1º bimestre', 'Pendente']];
+    const r = aplicarPosRecuperacao(linhas, [{ aluno: 'Ana Clara de Souza', turma: '6° ANO A', disciplina: 'MATEMATICA', bimestre: '1º', nota: 8 }]);
+    eq(r.linhas[0][5], '8', 'MATEMATICA do Mapão e MATEMÁTICA da tela são a mesma linha');
+  }
+
+  // Nada é mutado no lugar: a lista antiga continua servindo para o Cancelar.
+  {
+    const antes = [linha('3', '4')];
+    const copia = antes.map(l => l.slice());
+    aplicarPosRecuperacao(antes, mapao(3, 7));
+    eq(antes, copia, 'aplicarPosRecuperacao não mexe na lista que recebeu');
+  }
+}
+
+// -------------------------------------------------------------- notasPosRecuperacao
+{
+  const mapa = notasPosRecuperacao([
+    { aluno: 'ANA', turma: '6° ANO A', disciplina: 'MATEMATICA', bimestre: '1º', nota: 3 },
+    { aluno: 'ANA', turma: '6° ANO A', disciplina: 'MATEMATICA', bimestre: '2º', nota: 7 },
+  ]);
+  eq([...mapa.values()], [{ '1º': 3, '2º': 7 }], 'os dois bimestres do mesmo componente ficam na mesma entrada');
+}
+
+// -------------------------------------------------------------------- desfecho
+{
+  const com = valor => desfecho(['A', 'T', 'D', '3', '4', valor, '1º bimestre', '']);
+  eq(com('5'), 'Recuperou', '5,0 alcança a média');
+  eq(com('10'), 'Recuperou', 'nota cheia');
+  eq(com('4'), NO_RECOVERY, 'abaixo de 5 não alcança');
+  eq(com('1'), NO_RECOVERY, 'nota mínima');
+  eq(com(NO_RECOVERY), NO_RECOVERY, 'marcado à mão');
+  eq(com(NO_EXAM), NO_EXAM, 'quem não fez a prova não é o mesmo que não recuperou');
+  eq(com('—'), '', 'nada lançado, nada a dizer');
+}
+
+// ------------------------------------------------- Não recuperou no resto do app
+{
+  ok(semNota(NO_EXAM) && semNota(NO_RECOVERY), 'os dois desfechos sem nota moram no mesmo conjunto');
+  ok(!semNota('5') && !semNota('—'), 'nota e vazio não são desfecho');
+
+  // Linha que volta da planilha preenchida ou da sala: Não recuperou sobrevive e
+  // limpa o bimestre, como Não realizou já fazia.
+  eq(notaRecuperacao('Não recuperou'), NO_RECOVERY, 'o validador aceita Não recuperou');
+  eq(notaRecuperacao('nao recuperou'), NO_RECOVERY, 'sem acento e em caixa baixa também');
+  eq(notaRecuperacao('Não recuperou muito'), '—', 'texto parecido não passa');
+  const linha = linhasDaSala([['chave', 'ANA', '6° ANO A', 'MATEMATICA', '3', '4', 'Não recuperou', '2']])[0];
+  eq([linha[5], linha[6]], [NO_RECOVERY, ''], 'Não recuperou não tem bimestre a substituir');
+  eq(linha[7], 'Concluído', 'e fecha a linha');
+
+  eq(rowStatus(['A', 'T', 'D', '3', '4', NO_RECOVERY, '', '']), 'Concluído', 'rowStatus conhece o desfecho novo');
+}
+
+// ------------------------------------------------------- a coluna nova na ATA
+{
+  ok(ATA_COLUNAS.includes('Desfecho'), 'a ATA tem coluna de desfecho');
+  eq(ATA_COLUNAS.length, 7, 'sete colunas');
+  const celulas = celulasDaAta([
+    ['ANA', '6° ANO A', 'MATEMÁTICA', '3', '4', '7', '2º bimestre', 'Concluído'],
+    ['BRUNO', '6° ANO A', 'HISTÓRIA', '2', '—', NO_RECOVERY, '', 'Concluído'],
+  ]);
+  eq(celulas[0].length, 7, 'cabeçalho com sete células');
+  eq(celulas[1], ['ANA', 'MATEMÁTICA', '3', '4', '7', '2º bimestre', 'Recuperou'], 'quem alcançou média');
+  eq(celulas[2], ['BRUNO', 'HISTÓRIA', '2', '—', NO_RECOVERY, '____', NO_RECOVERY], 'Não recuperou aparece escrito, como Não realizou já aparecia');
+}
+
 
 console.log(`ok — ${checks} verificações`);

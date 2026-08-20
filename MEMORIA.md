@@ -331,6 +331,89 @@ O formato foi conferido no navegador, em 10/08/2026, contra a biblioteca de verd
 
 Quinze mutantes ao todo, quinze mortos. Quatro só morreram depois de o teste ficar mais forte: incluir aluno de outra turma na ATA sobrevivia porque o teste subia um lote de turma única; ignorar o `ataAtual` sobrevivia porque o teste só baixava a ATA da primeira turma; e colar as células da ATA da tela sobrevivia porque nada conferia que cada célula era um elemento próprio — lacuna que já existia antes deste trabalho e apareceu por acaso, quando um padrão de mutação casou com `ataRows` em vez da função que eu queria atingir.
 
+## Importação do Mapão pós-recuperação — 20/08/2026
+
+A nota da Avaliação de Recuperação Semestral foi lançada na Sala do Futuro e o
+Mapão voltou com ela **sobrescrita na célula do bimestre**, sem coluna própria.
+Quem tinha 3,0 no 1º bimestre aparece com a nota da prova naquela mesma célula.
+Então a nota não é lida: é descoberta comparando o Mapão novo com a lista da
+tela. Sem isso, eram 502 linhas digitadas à mão.
+
+Desenho em `docs/superpowers/specs/2026-08-20-importacao-pos-recuperacao-design.md`.
+
+### O que decidiu o formato
+
+`parseSheet` só guardava nota **abaixo de 5** — jogado no Mapão novo, descartaria
+justamente quem recuperou. Ganhou um terceiro parâmetro, `todasAsNotas`, usado só
+por esta importação. Sem o parâmetro a função entrega o que sempre entregou, e as
+verificações antigas são a rede que prova isso.
+
+### Regras, decididas com a coordenação em 20/08/2026
+
+- O bimestre que subiu é o substituído; a nota nova é a nota da recuperação.
+- Só bimestre que já estava em recuperação é comparado. `—` quer dizer que a nota
+  era 5,0 ou mais, e mudança ali é ruído.
+- Linha em que nada mudou vira `Não recuperou`. **O diff não separa** quem fez a
+  prova e não alcançou média de quem faltou: nos dois casos a origem fica igual.
+  `Não realizou` saiu do fluxo automático e só existe marcado à mão. Se um dia a
+  Sala do Futuro der um relatório de participação, ele separa os dois — seria uma
+  terceira importação, não uma mudança nesta.
+- O desfecho responde **"alcançou 5,0?"**, não "a nota mudou?". Quem foi de 2,0
+  para 4,0 tem nota 4, bimestre substituído e desfecho `Não recuperou`. É o que a
+  direção e a Diretoria de Ensino leem na ATA.
+- Mapão vence a digitação manual, e o conflito ainda entra nas divergências.
+- Nada torto é aplicado: nota que caiu, nota quebrada, os dois bimestres
+  alterados e linha ausente ficam destacadas, com o motivo no tooltip.
+- Nota é inteira, conferido no Mapão real. Decimal vira divergência — arredondar
+  seria mexer em nota de aluno em documento oficial.
+
+### Dois passos, de propósito
+
+O lote antigo expira em 12 horas e a nota só saiu depois de 12/08, então na hora
+de usar a tela está vazia: os dois lotes entram na mesma sessão, por botões
+diferentes. Foram descartadas duas alternativas mais curtas: detectar o Mapão
+pós-recuperação dentro do upload comum, que sobrescreveria nota de aluno em
+silêncio ao adivinhar errado; e guardar o lote original em chave sem expiração,
+que desfaz a decisão de retenção de 08/08/2026.
+
+O modal de resumo — preenchidas, não recuperou, divergências — aparece antes de
+aplicar. `Cancelar` não toca em nada, e `aplicarPosRecuperacao` não muta a lista
+que recebe, o que é o que faz o cancelar ser real.
+
+### Onde o `Não recuperou` mora
+
+É opção do dropdown de nota, irmã do `Não realizou`, e reaproveita o mecanismo
+que já desabilita o bimestre substituído. O desfecho é coluna **calculada**, só
+de leitura, em `desfecho(row)`.
+
+Consequência boa: a sala compartilhada e o Apps Script não mudaram —
+`linhasParaSala` manda `row.slice(0,7)` e o `CABECALHO` continua igual — e o
+`localStorage` também não, porque `restoreLocal` filtra `row.length>=8` e a linha
+continua com oito posições. Lote gravado antes desta mudança abre normalmente.
+
+O `Não recuperou` **não propaga** para as outras disciplinas do aluno, ao
+contrário do `Não realizou`: recuperação é por componente.
+
+Os dois valores sem nota ficam num conjunto só, `SEM_NOTA`, atrás de `semNota()`.
+O PR 20 nasceu de `Não realizou` escrito em quatro lugares com um deles esquecido
+— o `validateRecoveryScore`, que roda em fase de captura e rejeitava a opção nova
+sem dizer nada. Com o conjunto, valor novo entra num lugar só.
+
+### Verificação
+
+408 verificações automatizadas: 245 no `test-parser.mjs` e 163 no `test-app.mjs`.
+Doze mutantes, doze mortos — incluindo ignorar o `todasAsNotas`, aplicar nota que
+caiu, aplicar decimal, deixar o validador para trás, contar bimestre que não era
+candidato, e sumir com a coluna `Desfecho` da ATA.
+
+Uma regressão foi pega no caminho: a primeira versão fazia `Não realizou` virar
+`____` na ATA. O teste do PR 19 fixava o contrário — é informação, não lacuna —
+e reprovou. `Não recuperou` segue a mesma regra: aparece escrito.
+
+A ATA passou de seis para sete colunas na tela, na impressão e no `.docx`, e o
+Excel exportado ganhou `Desfecho` antes de `Status`. `parseExport` lê só as
+colunas 0 a 6, então a planilha preenchida continua voltando.
+
 ## Arquitetura do app.js
 
 - Havia uma base mais seis reatribuições de `extractWorkbook` e `showImported` empilhadas no fim do arquivo. A ordem entre elas decidia o resultado e não estava escrita em lugar nenhum, e cada camada reabria e reparseava a planilha inteira — quatro parses por arquivo.

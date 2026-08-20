@@ -35,6 +35,19 @@ const TURMA_A = [
   ['ALUNA SEM PENDENCIA', 'Ativo', '8', '9', '9', '9', '10', '10'],
   ['ALUNO TRANSFERIDO', 'Transferido', '1', '1', '1', '1', '1', '1'],
 ];
+// O mesmo Mapão da TURMA_A depois da Sala do Futuro, que é como a nota volta:
+// sobrescrita na célula do bimestre, sem coluna própria.
+//  ALUNA, MATEMÁTICA: 1º bim de 3 para 7  — recuperou
+//  ALUNA, HISTÓRIA:   nada mudou           — não recuperou
+//  ALUNA, GEOGRAFIA:  2º bim de 4 para 3   — nota caiu, divergência
+//  ALUNO, MATEMÁTICA: 1º bim de 2 para 4   — subiu e não alcançou média
+const TURMA_A_POS = [
+  ['ALUNO', 'SITUAÇÃO', 'MATEMATICA (1B)', 'MATEMATICA (2B)', 'HISTORIA (1B)', 'HISTORIA (2B)', 'GEOGRAFIA (1B)', 'GEOGRAFIA (2B)'],
+  ['ALUNA COM TRES PENDENCIAS', 'Ativo', '7', '4', '2', '2', '4', '3'],
+  ['ALUNO COM UMA PENDENCIA', 'Ativo', '4', '8', '8', '9', '9', '9'],
+  ['ALUNA SEM PENDENCIA', 'Ativo', '8', '9', '9', '9', '10', '10'],
+  ['ALUNO TRANSFERIDO', 'Transferido', '1', '1', '1', '1', '1', '1'],
+];
 const TURMA_B = [
   ['ALUNO', 'SITUAÇÃO', 'MATEMATICA (1B)', 'MATEMATICA (2B)'],
   ['ALUNA DA OUTRA TURMA', 'Ativo', '3', '3'],
@@ -148,7 +161,7 @@ function montarApp(opcoes = {}) {
   ponte.textContent = `window.__app = {
     get recoveryData(){return recoveryData}, get schoolName(){return schoolName},
     importBatch, renderAta, restoreLocal, switchView, recoveryRows,
-    validateUploadSelection, NO_EXAM, STORAGE_KEY, MAX_STORAGE_AGE_MS,
+    validateUploadSelection, NO_EXAM, NO_RECOVERY, desfecho, STORAGE_KEY, MAX_STORAGE_AGE_MS,
     get salaId(){return salaId}, conferirSala, chaveDaLinha
   };`;
   window.document.body.appendChild(ponte);
@@ -157,9 +170,7 @@ function montarApp(opcoes = {}) {
   // Drenar a fila de microtarefas é como o teste espera tudo assentar.
   const esperar = async () => { for (let i = 0; i < 50; i++) await new Promise(r => setTimeout(r, 0)); };
 
-  const subirLote = async (arquivos) => {
-    const input = window.document.querySelector('#folder-input');
-    const files = arquivos.map(([nome, linhas]) => {
+  const criarArquivos = (arquivos) => arquivos.map(([nome, linhas]) => {
       const bytes = new TextEncoder().encode(JSON.stringify(linhas));
       const file = new window.File([bytes], nome, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       // O File do jsdom não implementa arrayBuffer(); o app usa só name, size e ele.
@@ -167,10 +178,29 @@ function montarApp(opcoes = {}) {
         Object.defineProperty(file, 'arrayBuffer', { value: async () => bytes.buffer, configurable: true });
       }
       return file;
-    });
-    Object.defineProperty(input, 'files', { value: files, configurable: true });
+  });
+
+  const subirLote = async (arquivos) => {
+    const input = window.document.querySelector('#folder-input');
+    Object.defineProperty(input, 'files', { value: criarArquivos(arquivos), configurable: true });
     input.dispatchEvent(new window.Event('change', { bubbles: true }));
     await esperar();
+  };
+
+  // Mapão pós-recuperação: entra por um input próprio e pára no modal de resumo.
+  // resposta diz qual botão do modal é apertado — é o passo que decide se o lote
+  // é aplicado ou descartado.
+  const subirPos = async (arquivos, resposta = 'confirm-ok') => {
+    const input = window.document.querySelector('#pos-input');
+    Object.defineProperty(input, 'files', { value: criarArquivos(arquivos), configurable: true });
+    input.dispatchEvent(new window.Event('change', { bubbles: true }));
+    await esperar();
+    const modal = window.document.querySelector('#confirm-modal');
+    const aberto = modal.classList.contains('open');
+    const resumo = window.document.querySelector('#confirm-text').textContent;
+    if (aberto) window.document.querySelector(`#${resposta}`).click();
+    await esperar();
+    return { aberto, resumo };
   };
 
   // A sala liga um setInterval que segura o event loop do node para sempre.
@@ -187,7 +217,7 @@ function montarApp(opcoes = {}) {
     return String(no);
   };
 
-  return { window, doc: window.document, app: window.__app, subirLote, escritos, impressos, errosDeConsole, servidor, esperar, fechar, baixados, textoDoDocumento };
+  return { window, doc: window.document, app: window.__app, subirLote, subirPos, escritos, impressos, errosDeConsole, servidor, esperar, fechar, baixados, textoDoDocumento };
 }
 
 // ============================================================ 1. subir um lote
@@ -308,11 +338,11 @@ function montarApp(opcoes = {}) {
 
   const paper = doc.querySelector('.paper');
   const celulas = [...paper.querySelectorAll('.paper-table span')].map(s => s.textContent);
-  eq((celulas.length - 6) / 6, 4, 'a ATA tem uma linha por pendência');
+  eq((celulas.length - 7) / 7, 4, 'a ATA tem uma linha por pendência');
   // A grade é montada por concatenação de <span>. Se algo entrar entre eles, a
   // célula deixa de ser uma célula e o texto vaza para a coluna do lado.
   eq(paper.querySelector('.paper-table').textContent, celulas.join(''), 'a grade não tem texto solto entre as células');
-  eq(celulas.slice(0, 6), ['Aluno', 'Disciplina', 'Nota do primeiro bimestre', 'Nota do segundo bimestre', 'Nota da recuperação semestral', 'Bimestre substituído'], 'com o cabeçalho na ordem certa');
+  eq(celulas.slice(0, 7), ['Aluno', 'Disciplina', 'Nota do primeiro bimestre', 'Nota do segundo bimestre', 'Nota da recuperação semestral', 'Bimestre substituído', 'Desfecho'], 'com o cabeçalho na ordem certa');
   ok(celulas.includes('MATEMÁTICA'), 'e a disciplina acentuada como célula própria');
   ok(paper.querySelector('img.brasao'), 'o brasão está na ATA');
   ok(paper.querySelector('.paper-head'), 'dentro do cabeçalho em linha');
@@ -690,6 +720,115 @@ function montarApp(opcoes = {}) {
   doc.querySelector('#export-recovery').click();
   doc.querySelector('#clear-session').click();
   eq(errosDeConsole, [], 'nenhum erro ou aviso de console no caminho normal');
+}
+
+// ================================ importação do Mapão pós-recuperação
+// A nota da recuperação semestral voltou dentro do Mapão, sobrescrevendo a
+// célula do bimestre. Aqui o app opera como a coordenação opera: sobe o lote
+// dos dois bimestres, sobe o Mapão novo, lê o resumo e decide.
+
+// ------------------------------------------------- sem lote, não há o que comparar
+{
+  const { doc, app } = montarApp();
+  app.switchView('recovery');
+  doc.querySelector('#import-pos').click();
+  ok(doc.querySelector('#toast').textContent.includes('Importe primeiro os Mapões'),
+     'sem lote na tela o botão recusa e explica o que falta');
+  eq(app.recoveryData.length, 0, 'e nada entra');
+}
+
+// -------------------------------------------------------- Cancelar não toca em nada
+{
+  const { app, subirLote, subirPos } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  const antes = app.recoveryData.map(r => r.join('|'));
+  const { aberto, resumo } = await subirPos([[ARQUIVO_A, TURMA_A_POS]], 'confirm-cancel');
+  ok(aberto, 'o resumo aparece antes de aplicar');
+  ok(/2 linhas preenchidas/.test(resumo), 'e diz quantas linhas seriam preenchidas');
+  ok(/1 não recuperou/.test(resumo), 'quantas não recuperaram');
+  ok(/1 divergência/.test(resumo), 'e quantas ele não conseguiu decidir');
+  eq(app.recoveryData.map(r => r.join('|')), antes, 'Cancelar deixa a lista exatamente como estava');
+}
+
+// --------------------------------------------------------------- Aplicar preenche
+{
+  const { doc, app, subirLote, subirPos, escritos } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  app.switchView('recovery');
+  await subirPos([[ARQUIVO_A, TURMA_A_POS]]);
+
+  const linha = (aluno, disciplina) => app.recoveryData.find(r => r[0] === aluno && r[2] === disciplina);
+
+  const recuperou = linha('ALUNA COM TRES PENDENCIAS', 'MATEMÁTICA');
+  eq([recuperou[5], recuperou[6]], ['7', '1º bimestre'], 'a nota que subiu vira nota de recuperação, no bimestre que mudou');
+  eq(app.desfecho(recuperou), 'Recuperou', 'e alcançou a média');
+
+  const parada = linha('ALUNA COM TRES PENDENCIAS', 'HISTÓRIA');
+  eq([parada[5], parada[6]], [app.NO_RECOVERY, ''], 'nota igual nos dois bimestres é Não recuperou');
+  eq(parada[7], 'Concluído', 'e a linha fica resolvida, não pendente');
+
+  const subiuPouco = linha('ALUNO COM UMA PENDENCIA', 'MATEMÁTICA');
+  eq(subiuPouco[5], '4', 'nota abaixo de 5 também é nota de recuperação');
+  eq(app.desfecho(subiuPouco), app.NO_RECOVERY, 'o desfecho responde se alcançou 5,0, não se mudou');
+
+  const divergente = linha('ALUNA COM TRES PENDENCIAS', 'GEOGRAFIA');
+  eq(divergente[5], '—', 'nota que caiu não é aplicada sozinha');
+  eq(doc.querySelectorAll('#recovery-table tr.divergente').length, 1, 'e a linha fica destacada para decisão à mão');
+  ok(/a nota caiu/.test(doc.querySelector('#recovery-table tr.divergente').title), 'e a linha diz por que ficou de fora');
+
+  // A tela mostra a coluna nova, e ela é célula própria.
+  const cabecalho = [...doc.querySelectorAll('#recovery-view thead th')].map(th => th.textContent);
+  ok(cabecalho.includes('Desfecho'), 'a lista tem coluna de desfecho');
+  const celulas = [...doc.querySelectorAll('#recovery-table tr')].map(tr => [...tr.children].map(td => td.textContent));
+  eq(celulas[0].length, cabecalho.length, 'linha e cabeçalho com a mesma largura');
+  ok(celulas.some(c => c.includes('Recuperou')), 'e o desfecho aparece na tela');
+
+  // O Excel exportado leva a mesma coluna, e continua terminando em Status.
+  doc.querySelector('#export-recovery').click();
+  const planilha = escritos[escritos.length - 1].linhas;
+  eq(planilha[0].slice(-2).join('|'), 'Desfecho|Status', 'o Excel ganha Desfecho antes de Status');
+  eq(planilha[0].length, planilha[1].length, 'cabeçalho e linha com a mesma largura');
+}
+
+// ----------------------------------- Não recuperou escolhido à mão sobrevive
+// O PR 19 pôs Não realizou no dropdown e o PR 20 descobriu que ele não
+// funcionava: validateRecoveryScore roda em fase de captura e rejeitava tudo
+// que não fosse número. É o mesmo caminho que a opção nova precisa atravessar.
+{
+  const { window, doc, app, subirLote } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  app.switchView('recovery');
+
+  const alvo = app.recoveryData.findIndex(r => r[0] === 'ALUNO COM UMA PENDENCIA');
+  const sel = doc.querySelector(`select.score-input[data-index="${alvo}"]`);
+  ok([...sel.options].some(o => o.value === app.NO_RECOVERY), 'a opção existe no dropdown');
+  sel.value = app.NO_RECOVERY;
+  sel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  for (let i = 0; i < 20; i++) await new Promise(r => setTimeout(r, 0));
+
+  const linha = app.recoveryData[alvo];
+  eq(linha[5], app.NO_RECOVERY, 'o valor sobrevive ao validador');
+  eq(linha[6], '', 'sem bimestre a substituir');
+  eq(linha[7], 'Concluído', 'e a linha fecha');
+  eq(doc.querySelectorAll('select.replacement-select[disabled]').length, 1, 'o seletor de bimestre é desabilitado');
+  ok(!doc.querySelector('#confirm-modal').classList.contains('open'), 'e não propaga para as outras disciplinas: recuperação é por componente');
+}
+
+// ------------------------------------------------ a coluna nova chega na ATA em Word
+{
+  const { doc, app, subirLote, subirPos, baixados, textoDoDocumento, esperar } = montarApp();
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  await subirPos([[ARQUIVO_A, TURMA_A_POS]]);
+  app.switchView('minutes');
+  doc.querySelector('#generate-minutes').click();
+  app.renderAta(TURMA_A_NOME);
+  doc.querySelector('#download-ata-word').click();
+  await esperar();
+
+  const texto = textoDoDocumento(baixados[baixados.length - 1].doc);
+  ok(texto.includes('Desfecho'), 'a ATA em Word tem a coluna de desfecho');
+  ok(texto.includes('Recuperou'), 'com quem alcançou a média');
+  ok(texto.includes('Não recuperou'), 'e quem não alcançou');
 }
 
 console.log(`ok — ${checks} verificações de comportamento`);
