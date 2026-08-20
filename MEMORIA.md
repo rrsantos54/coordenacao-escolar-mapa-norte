@@ -144,9 +144,9 @@ Enquanto o item 1 não for feito, existem duas versões do app no ar e elas dive
 
 ## Como o app é testado
 
-`npm test` roda os dois arquivos e soma 322 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
+`npm test` roda os dois arquivos e soma 434 verificações. Rodam sozinhos em cada pull request pelo workflow `Testes`, que também recusa o merge se alguma planilha for versionada. Desde 10/08/2026 o check `testes` é obrigatório para mesclar.
 
-Contagem conferida em 10/08/2026: `test-parser.mjs` imprime 189 e `test-app.mjs` imprime 133. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
+Contagem conferida em 20/08/2026: `test-parser.mjs` imprime 252 e `test-app.mjs` imprime 182. Quem mexer nos testes atualiza este número aqui, senão ele volta a mentir.
 
 ### test-app.mjs — 133 verificações de comportamento
 
@@ -413,6 +413,71 @@ e reprovou. `Não recuperou` segue a mesma regra: aparece escrito.
 A ATA passou de seis para sete colunas na tela, na impressão e no `.docx`, e o
 Excel exportado ganhou `Desfecho` antes de `Status`. `parseExport` lê só as
 colunas 0 a 6, então a planilha preenchida continua voltando.
+
+## Baixar Excel e cores na ATA — 20/08/2026
+
+Pedido da coordenação: a ATA também sair em Excel, nota abaixo de 5,0 em
+vermelho, `Recuperou` em verde, e um bug em que o bimestre substituído
+reaparecia para quem já tinha sido marcado `Não recuperou`.
+
+### Baixar Excel
+
+Botão novo ao lado de `Imprimir / PDF` e `Baixar Word`, em `#download-ata-excel`.
+`baixarAtaExcel` reaproveita `celulasDaAta`, a mesma função que já alimenta o
+Word — as três saídas mostram sempre a mesma lista de aluno, sem uma segunda
+cópia da montagem. Usa o SheetJS que já está carregado para o `Exportar Excel`
+da lista de recuperação, sem CDN novo. `nomeDoArquivoAta` ganhou um segundo
+parâmetro, a extensão, com `docx` de padrão para não mexer nas chamadas que já
+existiam.
+
+### Cores: vermelho abaixo de 5, verde em Recuperou
+
+Só na ATA — tela, impressão e Word —, não na lista de recuperação da tela, que
+já tinha cor própria (`low-score`, em laranja) antes desta mudança; a
+coordenação decidiu manter as duas coisas separadas.
+
+- **Tela**: `ataRows` ganhou a classe `nota-baixa` nas três colunas de nota
+  (1º bimestre, 2º bimestre, recuperação) quando o valor já formatado é menor
+  que 5, e `nota-recuperou` na coluna Desfecho quando o valor é `Recuperou`.
+  As regras de cor entram em `styles.css`, dentro de `.paper-table`.
+- **Impressão**: a janela de `printAta` não carrega `styles.css` — é
+  `about:blank` com HTML escrito na mão —, então as mesmas duas regras foram
+  duplicadas no `<style>` que `printAta` monta. Esquecer um dos dois lados
+  faz a cor sumir só de um dos formatos, por isso os dois têm teste.
+- **Word**: `montarAtaWord` ganhou `corCelula(indice,coluna,valor)`, que
+  devolve a cor hexadecimal (sem `#`, como a biblioteca `docx` espera) para
+  `TextRun`. Mesmo corte de nota que a tela: `notaBaixa`, função nova, reusa
+  `parseNumber` sobre o valor já formatado pela ATA (`"3,5"` ou `"____"`), em
+  vez de reler a linha crua.
+
+O cabeçalho da tabela (`indice===0`) nunca recebe cor, em nenhum dos três
+formatos.
+
+### Bug: bimestre substituído reaparecia em quem não recuperou
+
+`combineRecords` sempre sugere um bimestre (o de menor nota, item 7.3 do FAQ)
+para linha nova, antes de qualquer nota de recuperação existir. Reimportar o
+mesmo Mapão — ou importar 1º e 2º bimestre em uploads separados — gera essa
+sugestão de novo, e `mergeRows` tinha uma checagem só de "o valor chegou
+preenchido" (`if(row[6])old[6]=row[6]`) para decidir se aplicava. Como a
+sugestão vem sempre preenchida, ela vencia mesmo quando a linha já estava
+`Não recuperou` ou `Não realizou`, com bimestre limpo de propósito. A ATA
+saía com "1º bimestre" ou "2º bimestre" para quem, por definição, não tem
+bimestre substituído nenhum — foi isso que a coordenação viu como "o bimestre
+ainda está puxando".
+
+Correção de uma linha: `mergeRows` agora limpa `old[6]` sempre que
+`semNota(old[5])` é verdadeiro, antes de considerar o valor que chegou.
+`aplicarPosRecuperacao` e o `<select>` da tela já faziam essa limpeza
+corretamente; só a mesclagem de lotes tinha o buraco. Reproduzido com
+mutação: revertendo a correção, os dois testes novos falham.
+
+### Verificação
+
+434 verificações no total: 252 no `test-parser.mjs`, 182 no `test-app.mjs`.
+Teste de mutação nos dois pontos: revertendo o `semNota` de `mergeRows`, os
+testes de bimestre fantasma falham; apagando a cor de `corCelula`, o teste do
+Word que confere `TextRun.color` falha.
 
 ## Arquitetura do app.js
 

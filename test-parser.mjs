@@ -58,7 +58,7 @@ const PUROS = [
   /^function novaSala\(sorteio=.*$/m,
   /^const ATA_COLUNAS=.*$/m,
   /^function celulasDaAta\(rows\).*$/m,
-  /^function nomeDoArquivoAta\(className\).*$/m,
+  /^function nomeDoArquivoAta\(className,ext='docx'\).*$/m,
 ];
 
 const EXPORTA = [
@@ -287,6 +287,35 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   eq(mergeRows(merged, segundo).length, 2, 'reimportar não duplica');
 }
 
+// ------------------------- bimestre não vaza de volta para quem não recuperou
+// combineRecords sempre sugere um bimestre para linha nova. Reimportar o mesmo
+// Mapão depois de marcar Não recuperou não pode devolver essa sugestão: virava
+// bimestre substituído fantasma na ATA de quem não tem nota nenhuma.
+{
+  const base = combineRecords([
+    { aluno: 'CARLA MOTA', turma: '6° ANO A', disciplina: 'MATEMATICA', bimestre: '1º', nota: 3 },
+  ]);
+  base[0][5] = NO_RECOVERY;
+  base[0][6] = '';
+  base[0][7] = rowStatus(base[0]);
+
+  // Reimportar o mesmo Mapão gera de novo a sugestão de bimestre.
+  const reimportado = combineRecords([
+    { aluno: 'CARLA MOTA', turma: '6° ANO A', disciplina: 'MATEMATICA', bimestre: '1º', nota: 3 },
+  ]);
+  eq(reimportado[0][6], '1º bimestre', 'combineRecords sempre sugere um bimestre para linha nova');
+
+  const depois = mergeRows(base, reimportado);
+  eq(depois[0][5], NO_RECOVERY, 'o desfecho continua Não recuperou');
+  eq(depois[0][6], '', 'a sugestão de bimestre não volta: quem não recuperou não tem bimestre a mostrar');
+
+  // A mesma fuga acontecia na ordem inversa, a que showImported usa ao combinar
+  // o lote recém-lido (fresh, com sugestão) com o Mapão pós-recuperação (restored).
+  const restored = base.map(r => r.slice());
+  const combinadoDeVolta = mergeRows(reimportado, restored);
+  eq(combinadoDeVolta[0][6], '', 'e na ordem inversa também: fresh como base, restored como entrada');
+}
+
 // ------------------------------------------------------------ status da linha
 {
   const base = ['A', 'T', 'D', '3', '4', '—', '', 'Pendente'];
@@ -497,6 +526,9 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   // Nome de arquivo não pode carregar acento nem barra: quebra download em
   // parte dos navegadores e vira caminho no Windows.
   ok(!/[^a-z0-9.-]/.test(nomeDoArquivoAta('9º ANO/B ÇÃO')), 'o nome sai só com letra, número, ponto e hífen');
+
+  // Baixar Excel usa o mesmo nome de arquivo, só trocando a extensão.
+  eq(nomeDoArquivoAta('6º ANO A', 'xlsx'), 'ata-6-ano-a.xlsx', 'mesmo nome, extensão xlsx');
 
   // A biblioteca do Word vem de CDN de terceiro. Sem SRI, quem controla o CDN
   // controla o que roda nesta página, que tem nome e nota de aluno na tela.
