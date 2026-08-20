@@ -349,6 +349,28 @@ Três cuidados:
 O ARGB do Excel é `FF` na frente do mesmo hexadecimal usado no Word, e a cor
 sai da mesma `classeDaCelula`. Cabeçalho em negrito e sem cor, igual ao Word.
 
+### Notas centralizadas
+
+Pedido da coordenação em 20/08/2026: número curto em coluna estreita fica
+melhor centralizado. Vale para as três colunas de nota — 1º bimestre, 2º
+bimestre e recuperação —, e só para elas: aluno, disciplina, bimestre
+substituído e desfecho continuam à esquerda.
+
+Como as quatro saídas alinham de formas diferentes, a regra é uma função só,
+`notaCentralizada(coluna)`, sobre as mesmas colunas de `celulasDaAta`:
+
+- **Tela**: `classesDaCelula` junta a classe de cor com `nota-centro` no mesmo
+  atributo, e a regra entra em `styles.css`, dentro de `.paper-table`.
+- **Impressão**: duplicada no `<style>` que `printAta` monta, pelo mesmo motivo
+  das cores — aquela janela não carrega o `styles.css`.
+- **Word**: `alignment` é do parágrafo, não do `TextRun`; a célula de nota
+  recebe `AlignmentType.CENTER`.
+- **Excel**: `s.alignment.horizontal`, ao lado do `s.font` da cor. A célula sem
+  cor mas com alinhamento continua ganhando `s` — por isso `pintarAtaExcel`
+  monta os dois pedaços separados antes de decidir se escreve.
+
+O cabeçalho das colunas de nota acompanha a centralização, nas quatro saídas.
+
 ### Traço no bimestre de quem não recuperou
 
 Mesmo pedido, terceira parte: quem não recuperou não substitui bimestre nenhum,
