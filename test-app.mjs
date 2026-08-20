@@ -368,7 +368,12 @@ function montarApp(opcoes = {}) {
 
   const paper = doc.querySelector('.paper');
   const celulas = [...paper.querySelectorAll('.paper-table span')].map(s => s.textContent);
-  eq((celulas.length - 7) / 7, 4, 'a ATA tem uma linha por pendência');
+  // A célula do aluno é uma por bloco, não uma por linha: ela ocupa o bloco
+  // inteiro por grid-row. As outras seis colunas seguem uma por pendência.
+  const celulasDeAluno = [...paper.querySelectorAll('.paper-table .aluno')];
+  eq((celulas.length - 7 - celulasDeAluno.length) / 6, 4, 'a ATA tem uma linha por pendência');
+  eq(celulasDeAluno.reduce((total, c) => total + Number(c.style.gridRow.replace('span ', '')), 0), 4,
+    'e os blocos de aluno cobrem exatamente essas quatro linhas');
   // A grade é montada por concatenação de <span>. Se algo entrar entre eles, a
   // célula deixa de ser uma célula e o texto vaza para a coluna do lado.
   eq(paper.querySelector('.paper-table').textContent, celulas.join(''), 'a grade não tem texto solto entre as células');
@@ -662,6 +667,9 @@ function montarApp(opcoes = {}) {
   eq(alinhamentoEm(tresPendencias, 2), 'center', 'a nota sai centralizada no Excel');
   eq(alinhamentoEm(0, 4), 'center', 'o cabeçalho da coluna de nota acompanha');
   eq(alinhamentoEm(tresPendencias, 0), undefined, 'e o nome do aluno não');
+  // Vertical, sim: sem isso o nome desce para a última linha do bloco mesclado.
+  eq(planilhaAta[`A${tresPendencias + 1}`].s.alignment.vertical, 'center', 'o nome fica no meio do bloco mesclado no Excel');
+  eq(planilhaAta.A1.s.alignment, undefined, 'o cabeçalho não precisa: não é mesclado');
 
   // Nome uma vez por bloco: a aluna com três componentes ocupa três linhas, o
   // nome fica só na primeira e a coluna A é mesclada nas três.
@@ -742,10 +750,11 @@ function montarApp(opcoes = {}) {
   // seguintes ficam vazias e sem borda de baixo, que é o que dá o efeito de
   // célula mesclada numa grade de CSS.
   eq((paper.match(/ALUNA COM TRES PENDENCIAS/g) || []).length, 1, 'o nome do aluno aparece uma vez só, mesmo com três componentes');
-  ok(paper.includes('<span class="aluno aluno-mesclado">ALUNA COM TRES PENDENCIAS</span>'), 'a primeira linha do bloco leva o nome e perde a borda de baixo');
-  eq((paper.match(/<span class="aluno[^"]*"><\/span>/g) || []).length, 2, 'as duas linhas seguintes trazem a célula do aluno vazia');
-  ok(paper.includes('<span class="aluno"></span>'), 'e a última do bloco recupera a borda, que fecha a mesclagem');
-  ok(paper.includes('<span class="aluno">ALUNO COM UMA PENDENCIA</span>'), 'quem tem um componente só não vira bloco mesclado');
+  ok(paper.includes('<span class="aluno" style="grid-row:span 3">ALUNA COM TRES PENDENCIAS</span>'),
+    'a célula do aluno ocupa as três linhas do bloco, e o nome é centralizado nela pelo CSS');
+  ok(!/<span class="aluno[^"]*"><\/span>/.test(paper), 'não sobra célula vazia: a mesclagem é de verdade');
+  ok(paper.includes('<span class="aluno" style="grid-row:span 1">ALUNO COM UMA PENDENCIA</span>'), 'quem tem um componente só ocupa uma linha');
+
 
   // A janela de impressão não carrega o styles.css: as duas regras têm que ir
   // no <style> que printAta escreve, senão a cor não aparece no PDF impresso.
@@ -756,8 +765,15 @@ function montarApp(opcoes = {}) {
   ok(impresso.includes('.nota-centro{text-align:center'), 'e o alinhamento das notas: a janela de impressão não carrega o styles.css');
   ok(impresso.includes('class="nota-baixa nota-centro">3<'), 'com as duas classes no HTML colado');
   ok(impresso.includes('.aluno{white-space:nowrap'), 'o nome do aluno não quebra linha na impressão');
-  ok(impresso.includes('.aluno-mesclado{border-bottom:none'), 'e a célula mesclada não leva borda');
+  ok(impresso.includes('.aluno{white-space:nowrap;overflow:visible;display:flex;align-items:center}'), 'e o nome fica no meio do bloco mesclado');
   ok(impresso.includes('grid-template-columns:minmax(max-content,2.6fr)'), 'a grade da impressão é a mesma da tela');
+
+  // A tela lê o styles.css e a impressão lê o <style> que printAta monta. São
+  // duas cópias das mesmas regras, e é fácil corrigir uma e esquecer a outra.
+  const css = readFileSync(new URL('styles.css', raiz), 'utf8');
+  ok(css.includes('.paper-table .aluno{white-space:nowrap;overflow:visible;display:flex;align-items:center}'),
+    'o styles.css tem a mesma regra do nome que a impressão');
+  ok(css.includes('grid-template-columns:minmax(max-content,2.6fr)'), 'e a mesma grade');
   ok(impresso.includes('class="nota-recuperou">Recuperou<'), 'e o HTML colado carrega as classes, não só o CSS');
 }
 

@@ -54,7 +54,7 @@ planilha de aluno não pode ser versionada neste repositório.
   a substituir.
 - Notas e bimestre substituído saem centralizados nas quatro saídas da ATA.
 - Aluno com vários componentes aparece uma vez só, com a célula do nome mesclada
-  para baixo, e o nome não quebra linha.
+  para baixo e o nome centralizado no bloco, sem quebrar linha.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
 - Sala compartilhada por link, quando ligada: duas pessoas lançam nota juntas.
 - Mantém arquivos originais intactos.
