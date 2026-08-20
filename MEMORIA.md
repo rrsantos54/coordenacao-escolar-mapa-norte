@@ -323,6 +323,32 @@ Junto veio a **caixa alta no fim do `cleanSubject`**. O Mapão manda quase tudo 
 
 O par `ESPANHOL` / `LINGUA ESPANHOLA` tem o mesmo defeito do inglês e continua apontando para dois nomes diferentes, mas **a escola não oferece espanhol** — confirmado com a coordenação em 11/08/2026. As duas entradas nunca são alcançadas e ficam na tabela sem custo. Se um dia a disciplina entrar na grade, é decidir o nome canônico e apontar as duas chaves para ele, como foi feito com o inglês.
 
+### Cor no Excel: o fork xlsx-js-style
+
+A primeira versão saiu sem cor na planilha porque o SheetJS publicado não
+escreve formatação de célula — é recurso da versão paga. A coordenação pediu a
+cor mesmo assim, e o caminho foi o `xlsx-js-style`, fork do SheetJS 0.18.5 que
+escreve `styles.xml`. Conferido antes de entrar: gerando uma planilha de teste,
+as cores aparecem em `xl/styles.xml` como `rgb="FF1E8449"` e `rgb="FFC0392B"`.
+
+Três cuidados:
+
+- **O fork se anuncia no mesmo `window.XLSX`.** Deixar por isso mesmo trocaria o
+  leitor do Mapão da 0.20.3 pela 0.18.5 sem ninguém pedir. `carregarXlsxEstilo`
+  guarda o global antes de injetar o script e o devolve no `onload`: a cópia com
+  estilo fica numa variável local, usada só para gravar a ATA. `style_version`,
+  que só o fork define, é como o app reconhece qual está na mão.
+- **Carregamento sob demanda**, como o do Word: são 425 KB, e quem só usa a
+  lista de recuperação não baixa nada. Vem do `cdn.jsdelivr.net`, que já estava
+  liberado na CSP para a biblioteca do Word, com SRI.
+- **CDN bloqueado não tira a planilha.** Rede de escola barra CDN; nesse caso a
+  ATA sai pelo SheetJS de sempre, sem cor, e o aviso diz por quê. O jsdom não
+  busca script externo nem dispara `onerror` sozinho, então o teste dispara o
+  erro no mesmo ponto em que o navegador dispararia (`cdnDeCorBloqueada`).
+
+O ARGB do Excel é `FF` na frente do mesmo hexadecimal usado no Word, e a cor
+sai da mesma `classeDaCelula`. Cabeçalho em negrito e sem cor, igual ao Word.
+
 ### Traço no bimestre de quem não recuperou
 
 Mesmo pedido, terceira parte: quem não recuperou não substitui bimestre nenhum,
@@ -351,7 +377,11 @@ no bimestre — o total foi para 464 verificações, 273 no `test-parser.mjs` e 
 no `test-app.mjs`. Três mutantes, três mortos: devolver `row[6]` sem olhar o
 desfecho, apagar o verde de nota alta e apagar o vermelho de `Não recuperou`
 derrubam um teste cada. O Excel não leva cor — o SheetJS publicado não formata
-célula —, mas leva o traço, porque ali é conteúdo, e há teste disso.
+célula. Isso mudou logo depois: ver a seção do `xlsx-js-style` acima, que
+trouxe a cor para a planilha e levou o total para 477 verificações, 273 no
+`test-parser.mjs` e 204 no `test-app.mjs`, com mais quatro mutantes mortos —
+não pintar a planilha, pintar sem cor nenhuma, e deixar cair quando o CDN da
+biblioteca de cor não responde.
 
 ## Importação do Mapão pós-recuperação — 20/08/2026
 

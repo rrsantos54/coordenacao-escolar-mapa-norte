@@ -48,8 +48,8 @@ planilha de aluno não pode ser versionada neste repositório.
   botão `Apagar dados`.
 - Exportação para Excel e ATA por turma em `Imprimir / PDF`, `Baixar Word` ou
   `Baixar Excel`.
-- Cor na ATA — tela, impressão e Word: nota abaixo de 5,0 e `Não recuperou` em
-  vermelho; nota a partir de 5,0 e `Recuperou` em verde.
+- Cor na ATA — tela, impressão, Word e Excel: nota abaixo de 5,0 e
+  `Não recuperou` em vermelho; nota a partir de 5,0 e `Recuperou` em verde.
 - Quem não recuperou sai com `-` no bimestre substituído, porque não há bimestre
   a substituir.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
