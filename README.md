@@ -34,8 +34,9 @@ planilha de aluno não pode ser versionada neste repositório.
   consolidado.
 - Parser usa SheetJS carregado por CDN.
 - Identifica `ALUNO`, `Turma`, bimestre e disciplinas no layout Mapão.
-- Lista notas abaixo de 5,0 e exclui transferidos e componentes fora da
-  recuperação semestral.
+- Lista notas abaixo de 5,0 e exclui transferidos e os componentes fora da
+  recuperação semestral: Arte, Educação Física, Projeto de Vida, Redação e
+  Leitura e Tecnologia e Inovação, que não integram a Prova Paulista.
 - Lançamento da nota de recuperação, com as opções `Não realizou a prova` e
   `Não recuperou`, e propagação de `Não realizou` para as demais disciplinas do
   mesmo aluno.
