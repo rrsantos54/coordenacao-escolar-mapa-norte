@@ -323,6 +323,21 @@ Junto veio a **caixa alta no fim do `cleanSubject`**. O Mapão manda quase tudo 
 
 O par `ESPANHOL` / `LINGUA ESPANHOLA` tem o mesmo defeito do inglês e continua apontando para dois nomes diferentes, mas **a escola não oferece espanhol** — confirmado com a coordenação em 11/08/2026. As duas entradas nunca são alcançadas e ficam na tabela sem custo. Se um dia a disciplina entrar na grade, é decidir o nome canônico e apontar as duas chaves para ele, como foi feito com o inglês.
 
+### Traço no bimestre de quem não recuperou
+
+Mesmo pedido, terceira parte: quem não recuperou não substitui bimestre nenhum,
+e a ATA trazia ali a lacuna `____`, que pede preenchimento à mão do que não
+existe. `bimestreDaAta(row)` decide pelo desfecho, não pelo campo: desfecho
+preenchido e diferente de `Recuperou` sai `-`; o resto segue com `row[6]` ou a
+lacuna. A ordem importa e foi um defeito encontrado no meio do trabalho — o
+Mapão pós-recuperação sugere bimestre para **toda** nota que subiu, inclusive a
+que subiu sem alcançar 5,0 (2 para 4, por exemplo). Lendo `row[6]` primeiro, a
+ATA mostrava `1º bimestre` para quem estava `Não recuperou`. O desfecho é que
+manda.
+
+Sem nota lançada ainda, o desfecho é vazio e a lacuna continua: ali a decisão
+não foi tomada, e a coordenação ainda escreve à mão.
+
 ### Verificação
 
 O `test-app.mjs` substitui o `docx` por um dublê que guarda tipo e opções de cada objeto, e o teste pergunta se o texto esperado está no documento. Isso cobre a composição, não o formato.
@@ -330,6 +345,13 @@ O `test-app.mjs` substitui o `docx` por um dublê que guarda tipo e opções de 
 O formato foi conferido no navegador, em 10/08/2026, contra a biblioteca de verdade servida por `python3 -m http.server`: o blob sai com o MIME do OOXML, começa com `PK` — é zip —, tem 86.453 bytes com brasão e 9.240 sem, o que prova que a imagem entra mesmo. Nenhuma exceção, então a API está usada certo. É o mesmo método de fronteira do SheetJS: o dublê cobre a lógica, o navegador cobre a biblioteca.
 
 Quinze mutantes ao todo, quinze mortos. Quatro só morreram depois de o teste ficar mais forte: incluir aluno de outra turma na ATA sobrevivia porque o teste subia um lote de turma única; ignorar o `ataAtual` sobrevivia porque o teste só baixava a ATA da primeira turma; e colar as células da ATA da tela sobrevivia porque nada conferia que cada célula era um elemento próprio — lacuna que já existia antes deste trabalho e apareceu por acaso, quando um padrão de mutação casou com `ataRows` em vez da função que eu queria atingir.
+
+Na segunda leva — verde a partir de 5,0, `Não recuperou` em vermelho e o traço
+no bimestre — o total foi para 464 verificações, 273 no `test-parser.mjs` e 191
+no `test-app.mjs`. Três mutantes, três mortos: devolver `row[6]` sem olhar o
+desfecho, apagar o verde de nota alta e apagar o vermelho de `Não recuperou`
+derrubam um teste cada. O Excel não leva cor — o SheetJS publicado não formata
+célula —, mas leva o traço, porque ali é conteúdo, e há teste disso.
 
 ## Importação do Mapão pós-recuperação — 20/08/2026
 
@@ -430,7 +452,22 @@ da lista de recuperação, sem CDN novo. `nomeDoArquivoAta` ganhou um segundo
 parâmetro, a extensão, com `docx` de padrão para não mexer nas chamadas que já
 existiam.
 
-### Cores: vermelho abaixo de 5, verde em Recuperou
+### Cores: vermelho abaixo de 5 e em Não recuperou, verde a partir de 5 e em Recuperou
+
+Em 20/08/2026 a coordenação completou o pedido: além de vermelho abaixo de 5,0,
+verde para nota a partir de 5,0 e vermelho para `Não recuperou`. A regra virou
+uma função só, `classeDaCelula(coluna,valor)`, que responde pela coluna de
+`celulasDaAta` — 2, 3 e 4 são nota, 6 é desfecho — e devolve o nome da classe
+do CSS. A tela usa esse nome direto, e o Word traduz por um mapa de duas
+entradas (`nota-baixa` → `C0392B`, `nota-recuperou` → `1E8449`). `ataRows`
+passou a montar as células a partir de `celulasDaAta`, em vez de repetir a
+montagem: a tela, o Word e o Excel leem a mesma linha, então cor e conteúdo não
+podem mais divergir entre formatos. `Não realizou` fica sem cor de propósito —
+não é aprovação nem reprovação, é ausência de prova.
+
+O texto abaixo descreve a primeira metade dessa mudança, publicada horas antes.
+
+### Cores: vermelho abaixo de 5, verde em Recuperou (primeira versão)
 
 Só na ATA — tela, impressão e Word —, não na lista de recuperação da tela, que
 já tinha cor própria (`low-score`, em laranja) antes desta mudança; a

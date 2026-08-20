@@ -57,6 +57,10 @@ const PUROS = [
   /^const SALA_ALFABETO=.*$/m,
   /^function novaSala\(sorteio=.*$/m,
   /^const ATA_COLUNAS=.*$/m,
+  /^function notaBaixa\(v\).*$/m,
+  /^function notaAlta\(v\).*$/m,
+  /^function classeDaCelula\(coluna,valor\).*$/m,
+  /^function bimestreDaAta\(row\).*$/m,
   /^function celulasDaAta\(rows\).*$/m,
   /^function nomeDoArquivoAta\(className,ext='docx'\).*$/m,
 ];
@@ -68,7 +72,7 @@ const EXPORTA = [
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
-  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -80,7 +84,7 @@ const {
   parseExport, notaRecuperacao, bimestreSubstituido,
   NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
-  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula,
 } = api;
 
 let checks = 0;
@@ -763,7 +767,43 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ]);
   eq(celulas[0].length, 7, 'cabeçalho com sete células');
   eq(celulas[1], ['ANA', 'MATEMÁTICA', '3', '4', '7', '2º bimestre', 'Recuperou'], 'quem alcançou média');
-  eq(celulas[2], ['BRUNO', 'HISTÓRIA', '2', '—', NO_RECOVERY, '____', NO_RECOVERY], 'Não recuperou aparece escrito, como Não realizou já aparecia');
+  eq(celulas[2], ['BRUNO', 'HISTÓRIA', '2', '—', NO_RECOVERY, '-', NO_RECOVERY], 'Não recuperou aparece escrito, como Não realizou já aparecia');
+}
+
+// ------------------------------------- bimestre substituído de quem não recuperou
+// Quem não recuperou não substitui bimestre nenhum. A lacuna ____ pedia que
+// alguém preenchesse à mão o que não existe, então ali vai um traço.
+{
+  const bimestre = linha => celulasDaAta([linha])[1][5];
+  eq(bimestre(['BRUNO', 'T', 'HISTÓRIA', '2', '—', NO_RECOVERY, '', 'Concluído']), '-', 'Não recuperou sai com traço');
+  eq(bimestre(['CARLA', 'T', 'HISTÓRIA', '2', '—', '3', '', 'Concluído']), '-', 'nota de recuperação abaixo de 5 também não substitui bimestre');
+  eq(bimestre(['DINA', 'T', 'HISTÓRIA', '2', '—', NO_EXAM, '', 'Concluído']), '-', 'quem não realizou a prova idem');
+  eq(bimestre(['ELIAS', 'T', 'HISTÓRIA', '2', '—', '7', '1º bimestre', 'Concluído']), '1º bimestre', 'quem recuperou mantém o bimestre escolhido');
+  // O Mapão pós-recuperação sugere bimestre para toda nota que subiu, inclusive
+  // a que subiu sem alcançar 5,0. Nesse caso o traço vence a sugestão.
+  eq(bimestre(['HELIO', 'T', 'HISTÓRIA', '2', '—', '4', '1º bimestre', 'Concluído']), '-', 'nota que subiu sem alcançar média sai com traço, mesmo com bimestre sugerido');
+  eq(bimestre(['FABIO', 'T', 'HISTÓRIA', '2', '—', '7', '', 'Pendente']), '____', 'recuperou sem bimestre escolhido continua lacuna para preencher');
+  eq(bimestre(['GINA', 'T', 'HISTÓRIA', '2', '—', '—', '', 'Pendente']), '____', 'sem nota lançada, nada a decidir ainda');
+}
+
+// ----------------------------------------------------------- cores da ATA
+// Uma regra só para tela, impressão e Word: vermelho para nota abaixo de 5,0 e
+// para Não recuperou; verde para nota a partir de 5,0 e para Recuperou.
+{
+  eq(classeDaCelula(2, '4'), 'nota-baixa', 'nota do primeiro bimestre abaixo de 5 em vermelho');
+  eq(classeDaCelula(3, '4,5'), 'nota-baixa', 'vírgula decimal também é lida');
+  eq(classeDaCelula(4, '3'), 'nota-baixa', 'nota da recuperação abaixo de 5 em vermelho');
+  eq(classeDaCelula(4, '5'), 'nota-recuperou', 'nota 5 já é verde: a média é alcançada em 5,0');
+  eq(classeDaCelula(2, '10'), 'nota-recuperou', 'nota do bimestre a partir de 5 em verde');
+  eq(classeDaCelula(6, 'Recuperou'), 'nota-recuperou', 'Recuperou em verde');
+  eq(classeDaCelula(6, NO_RECOVERY), 'nota-baixa', 'Não recuperou em vermelho');
+  eq(classeDaCelula(4, NO_RECOVERY), 'nota-baixa', 'e também na coluna de nota, onde o mesmo texto aparece');
+  eq(classeDaCelula(6, NO_EXAM), '', 'Não realizou não é aprovação nem reprovação: fica sem cor');
+  eq(classeDaCelula(6, '____'), '', 'desfecho em branco fica sem cor');
+  eq(classeDaCelula(4, '____'), '', 'lacuna de nota fica sem cor');
+  eq(classeDaCelula(4, NO_EXAM), '', 'Não realizou continua sem cor em qualquer coluna');
+  eq(classeDaCelula(0, '4'), '', 'nome de aluno nunca ganha cor');
+  eq(classeDaCelula(5, '1º bimestre'), '', 'bimestre substituído nunca ganha cor');
 }
 
 

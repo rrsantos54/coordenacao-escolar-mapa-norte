@@ -608,6 +608,9 @@ function montarApp(opcoes = {}) {
   const semCabecalho = escritos[0].linhas.slice(1);
   ok(semCabecalho.some(l => l[0] === 'ALUNA COM TRES PENDENCIAS'), 'traz os alunos da turma selecionada');
   ok(!semCabecalho.some(l => l[0] === 'ALUNA DA OUTRA TURMA'), 'e não os de outra turma');
+  // Cor o Excel não leva — o SheetJS publicado não formata célula —, mas o traço
+  // do bimestre é conteúdo e tem que chegar igual nas três saídas.
+  eq(semCabecalho.filter(l => l[6] === app.NO_RECOVERY).every(l => l[5] === '-'), true, 'quem não recuperou sai com traço no bimestre');
 
   // Sem lote não há ATA: o botão avisa em vez de baixar arquivo vazio.
   const vazio = montarApp();
@@ -632,6 +635,12 @@ function montarApp(opcoes = {}) {
   ok(paper.includes('class="nota-baixa">4<'), 'nota de recuperação abaixo de 5 (quem não recuperou) também sai em vermelho');
   ok(paper.includes('class="nota-recuperou">Recuperou<'), 'quem recuperou sai em verde');
   ok(!/class="nota-baixa">Recuperou</.test(paper), 'Recuperou nunca sai como nota baixa');
+  ok(paper.includes('class="nota-recuperou">7<'), 'nota de recuperação a partir de 5 sai em verde');
+  ok(paper.includes(`class="nota-baixa">${app.NO_RECOVERY}<`), 'Não recuperou sai em vermelho');
+  // Quem não recuperou não substitui bimestre nenhum: traço, não lacuna a preencher.
+  ok(paper.includes('<span>-</span>'), 'o bimestre de quem não recuperou sai com traço');
+  ok(paper.includes('<span>1º bimestre</span>'), 'e quem recuperou continua mostrando o bimestre substituído');
+  eq((paper.match(/<span>-<\/span>/g) || []).length, 2, 'os dois que não recuperaram saem com traço, inclusive o que tinha bimestre sugerido pelo Mapão');
 
   // A janela de impressão não carrega o styles.css: as duas regras têm que ir
   // no <style> que printAta escreve, senão a cor não aparece no PDF impresso.
@@ -906,6 +915,11 @@ function montarApp(opcoes = {}) {
   ok(notaBaixaNoWord && notaBaixaNoWord.color === 'C0392B', 'nota de recuperação abaixo de 5 sai em vermelho no Word');
   const recuperouNoWord = runs.find(r => r.text === 'Recuperou');
   ok(recuperouNoWord && recuperouNoWord.color === '1E8449', 'e Recuperou sai em verde no Word');
+  const notaAltaNoWord = runs.find(r => r.text === '7');
+  ok(notaAltaNoWord && notaAltaNoWord.color === '1E8449', 'nota a partir de 5 sai em verde no Word');
+  const naoRecuperouNoWord = runs.filter(r => r.text === app.NO_RECOVERY);
+  ok(naoRecuperouNoWord.length && naoRecuperouNoWord.every(r => r.color === 'C0392B'), 'e Não recuperou sai em vermelho no Word, na coluna de nota e na de desfecho');
+  ok(runs.some(r => r.text === '-' && r.color === undefined), 'o traço do bimestre não recuperado fica sem cor');
   const cabecalhoNoWord = runs.find(r => r.text === 'Aluno');
   ok(cabecalhoNoWord && cabecalhoNoWord.color === undefined, 'o cabeçalho da tabela não ganha cor');
 }
