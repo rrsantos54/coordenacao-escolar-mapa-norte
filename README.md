@@ -49,7 +49,7 @@ planilha de aluno não pode ser versionada neste repositório.
 - Exportação para Excel e ATA por turma em `Imprimir / PDF`, `Baixar Word` ou
   `Baixar Excel`.
 - ATA com abertura datada no dia da geração, período das avaliações registrado,
-  e assinatura de Professores, Coordenação e Direção.
+  e uma linha de assinatura por professor do quadro, além de Coordenação e Direção.
 - Cor na ATA — tela, impressão, Word e Excel: nota abaixo de 5,0 e
   `Não recuperou` em vermelho; nota a partir de 5,0 e `Recuperou` em verde.
 - Quem não recuperou sai com `-` no bimestre substituído, porque não há bimestre

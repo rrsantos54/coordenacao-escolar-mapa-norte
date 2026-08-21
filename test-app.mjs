@@ -191,7 +191,7 @@ function montarApp(opcoes = {}) {
   ponte.textContent = `window.__app = {
     get recoveryData(){return recoveryData}, get schoolName(){return schoolName},
     importBatch, renderAta, restoreLocal, switchView, recoveryRows,
-    validateUploadSelection, NO_EXAM, NO_RECOVERY, desfecho, STORAGE_KEY, MAX_STORAGE_AGE_MS,
+    validateUploadSelection, NO_EXAM, NO_RECOVERY, desfecho, STORAGE_KEY, MAX_STORAGE_AGE_MS, PROFESSORES,
     get salaId(){return salaId}, conferirSala, chaveDaLinha
   };`;
   window.document.body.appendChild(ponte);
@@ -395,7 +395,10 @@ function montarApp(opcoes = {}) {
   const professores = paper.querySelector('.teachers');
   ok(professores, 'a ATA tem bloco de assinatura dos professores');
   ok(professores.textContent.startsWith('Professores'), 'rotulado');
-  eq(professores.querySelectorAll('span').length, 4, 'com quatro linhas em branco');
+  eq(professores.querySelectorAll('span').length, app.PROFESSORES.length, 'uma linha por professor do quadro');
+  eq(professores.querySelectorAll('span small').length, app.PROFESSORES.length, 'cada uma com o nome embaixo');
+  ok(professores.textContent.includes('ADRIANA APARECIDA BOLDRINI'), 'o primeiro nome da lista aparece');
+  ok(professores.textContent.includes('VÍNICIUS FORNAROLO DE OLIVEIRA'), 'e o último também, com acento');
   eq(paper.querySelectorAll('.signatures span').length, 2, 'e Coordenação e Direção continuam abaixo');
 
   ok(paper.querySelector('img.brasao'), 'o brasão está na ATA');
@@ -1045,7 +1048,8 @@ function montarApp(opcoes = {}) {
   ok(texto.includes('Professores:'), 'e o bloco de assinatura dos professores');
   // Exatamente 18 traços: as linhas de Coordenação e Direção têm 20, e um
   // split ingênuo contaria as duas junto.
-  eq((texto.match(/(?<!_)_{18}(?!_)/g) || []).length, 4, 'com quatro linhas em branco');
+  eq((texto.match(/(?<!_)_{18}(?!_)/g) || []).length, app.PROFESSORES.length, 'uma linha por professor do quadro');
+  ok(app.PROFESSORES.every(nome => texto.includes(nome)), 'e todos os nomes saem no Word');
   ok(texto.includes('Coordenação'), 'Coordenação e Direção seguem assinando');
   ok(texto.includes('Desfecho'), 'a ATA em Word tem a coluna de desfecho');
   ok(texto.includes('Recuperou'), 'com quem alcançou a média');

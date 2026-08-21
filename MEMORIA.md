@@ -395,13 +395,28 @@ lugares — o template do `index.html`, o `renderAta` e o `montarAtaWord` —, e
 duas cópias podiam divergir sem ninguém ver. O período fica em
 `PERIODO_DA_AVALIACAO`: é o campo que muda a cada semestre.
 
-**Assinaturas.** A ATA tinha só Coordenação e Direção. A coordenação escolheu
-acrescentar uma faixa `Professores:` com quatro linhas em branco, sem rótulo de
-componente. O Mapão não traz nome de professor em coluna nenhuma — conferido —,
-então a alternativa de uma linha por componente exigiria digitação à mão de
-qualquer jeito, e a faixa livre resolve com menos papel. No Word o bloco é uma
-tabela sem borda de quatro células, o mesmo recurso que o cabeçalho com brasão
-já usava.
+**Assinaturas.** A ATA tinha só Coordenação e Direção. Ganhou uma faixa
+`Professores:` acima delas. Começou com quatro linhas em branco e, no mesmo
+dia, virou uma linha por professor do quadro, com o nome impresso embaixo: a
+coordenação entregou os onze nomes, e assinatura identificada vale mais que
+linha anônima num documento que a Diretoria de Ensino pode conferir.
+
+A lista mora em `PROFESSORES`, digitada no `app.js`. O Mapão não traz nome de
+professor em coluna nenhuma — conferido no consolidado e no pós-recuperação —,
+então não há de onde derivar. Digitação à mão erra, e é por isso que o teste
+cobra espaço sobrando nas pontas, nome vazio, nome repetido e ordem alfabética:
+são os erros que aparecem ao copiar de uma planilha.
+
+São três por fileira, `fileirasDeProfessor` faz o corte, e com onze nomes a
+última fileira vem com dois. Fileira incompleta em tabela do Word é válida —
+conferido na biblioteca de verdade, sai `[3, 3, 3, 2]` células. No Word o bloco
+é uma tabela sem borda, o mesmo recurso do cabeçalho com brasão.
+
+**Limite conhecido:** todos os onze aparecem em toda ATA, de toda turma. Não há
+como saber quem leciona o quê — o Mapão não relaciona professor e componente.
+Se isso incomodar na conferência, o caminho é digitar o par
+professor–componente e filtrar pela lista de componentes da turma, que essa a
+ATA já tem.
 
 A linha de professor tem 18 traços e a de Coordenação tem 20. Parece detalhe,
 mas o teste que conta as linhas em branco precisa distinguir as duas: um
