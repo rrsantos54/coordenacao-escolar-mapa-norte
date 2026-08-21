@@ -56,6 +56,9 @@ const PUROS = [
   /^function salaDaUrl\(hash\).*$/m,
   /^const SALA_ALFABETO=.*$/m,
   /^function novaSala\(sorteio=.*$/m,
+  /^const PROFESSORES=.*$/m,
+  /^const PROFESSORES_POR_LINHA=.*$/m,
+  /^function fileirasDeProfessor\(nomes=PROFESSORES\).*$/m,
   /^const MESES_POR_EXTENSO=.*$/m,
   /^const ANO_POR_EXTENSO=.*$/m,
   /^function aberturaDaAta\(hoje=new Date\(\)\).*$/m,
@@ -80,7 +83,7 @@ const EXPORTA = [
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
-  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno', 'aberturaDaAta',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno', 'aberturaDaAta', 'PROFESSORES', 'fileirasDeProfessor',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -92,7 +95,7 @@ const {
   parseExport, notaRecuperacao, bimestreSubstituido,
   NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
-  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno, aberturaDaAta,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno, aberturaDaAta, PROFESSORES, fileirasDeProfessor,
 } = api;
 
 let checks = 0;
@@ -526,6 +529,25 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   const [linhaA] = combineRecords(semSufixo.records);
   const [linhaB] = combineRecords(comSufixo.records);
   eq(chaveDaLinha(linhaA), chaveDaLinha(linhaB), 'e as duas linhas casam na chave');
+}
+
+// ------------------------------------ quadro de professores para assinatura
+// A lista é digitada à mão porque o Mapão não traz professor. Digitação à mão
+// erra: espaço sobrando no fim do nome, linha vazia, nome repetido.
+{
+  ok(PROFESSORES.length > 0, 'o quadro tem professores');
+  eq(PROFESSORES.filter(nome => nome !== nome.trim()).length, 0, 'nenhum nome com espaço sobrando nas pontas');
+  eq(PROFESSORES.filter(nome => !nome).length, 0, 'nenhum nome vazio');
+  eq(new Set(PROFESSORES).size, PROFESSORES.length, 'nenhum nome repetido');
+  eq([...PROFESSORES].sort((a, b) => a.localeCompare(b, 'pt-BR')).join('|'), PROFESSORES.join('|'), 'a lista está em ordem alfabética');
+
+  // As fileiras cobrem todo mundo, e só a última pode vir incompleta.
+  const fileiras = fileirasDeProfessor();
+  eq(fileiras.flat().join('|'), PROFESSORES.join('|'), 'as fileiras cobrem o quadro inteiro, na ordem');
+  eq(fileiras.slice(0, -1).every(f => f.length === 3), true, 'três por fileira');
+  ok(fileiras[fileiras.length - 1].length <= 3, 'e a última no máximo isso');
+  eq(fileirasDeProfessor([]).length, 0, 'quadro vazio não gera fileira');
+  eq(fileirasDeProfessor(['A']).length, 1, 'um professor gera uma fileira');
 }
 
 // ------------------------------------------------- data de abertura da ATA
