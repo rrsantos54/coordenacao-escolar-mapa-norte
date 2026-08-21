@@ -379,6 +379,23 @@ function montarApp(opcoes = {}) {
   eq(paper.querySelector('.paper-table').textContent, celulas.join(''), 'a grade não tem texto solto entre as células');
   eq(celulas.slice(0, 7), ['Aluno', 'Disciplina', 'Nota do primeiro bimestre', 'Nota do segundo bimestre', 'Nota da recuperação semestral', 'Bimestre substituído', 'Desfecho'], 'com o cabeçalho na ordem certa');
   ok(celulas.includes('MATEMÁTICA'), 'e a disciplina acentuada como célula própria');
+  // Abertura: diz o que a ATA registra, em que turma e quando as avaliações
+  // foram aplicadas. É texto de documento oficial, e o mesmo tem que sair no
+  // Word — por isso ele mora numa constante só.
+  const abertura = paper.querySelector('.paper-intro').textContent;
+  ok(abertura.includes('procedeu-se ao registro dos resultados da Recuperação Semestral'), 'a abertura diz o que a ATA registra');
+  ok(abertura.includes('período de 03 a 07 de agosto de 2026'), 'e em que período as avaliações foram aplicadas');
+  ok(abertura.includes(TURMA_A_NOME), 'com a turma no meio da frase');
+  ok(abertura.trim().endsWith(':'), 'e termina puxando a tabela que vem abaixo');
+
+  // Assinatura: quatro linhas em branco para os professores, acima das de
+  // Coordenação e Direção.
+  const professores = paper.querySelector('.teachers');
+  ok(professores, 'a ATA tem bloco de assinatura dos professores');
+  ok(professores.textContent.startsWith('Professores'), 'rotulado');
+  eq(professores.querySelectorAll('span').length, 4, 'com quatro linhas em branco');
+  eq(paper.querySelectorAll('.signatures span').length, 2, 'e Coordenação e Direção continuam abaixo');
+
   ok(paper.querySelector('img.brasao'), 'o brasão está na ATA');
   ok(paper.querySelector('.paper-head'), 'dentro do cabeçalho em linha');
   ok(paper.querySelector('.paper-center').textContent.includes('E.E.'), 'o cabeçalho traz a unidade');
@@ -1020,6 +1037,13 @@ function montarApp(opcoes = {}) {
   await esperar();
 
   const texto = textoDoDocumento(baixados[baixados.length - 1].doc);
+  ok(texto.includes('procedeu-se ao registro dos resultados da Recuperação Semestral'), 'a abertura do Word é a mesma da tela');
+  ok(texto.includes('período de 03 a 07 de agosto de 2026'), 'com o período das avaliações');
+  ok(texto.includes('Professores:'), 'e o bloco de assinatura dos professores');
+  // Exatamente 18 traços: as linhas de Coordenação e Direção têm 20, e um
+  // split ingênuo contaria as duas junto.
+  eq((texto.match(/(?<!_)_{18}(?!_)/g) || []).length, 4, 'com quatro linhas em branco');
+  ok(texto.includes('Coordenação'), 'Coordenação e Direção seguem assinando');
   ok(texto.includes('Desfecho'), 'a ATA em Word tem a coluna de desfecho');
   ok(texto.includes('Recuperou'), 'com quem alcançou a média');
   ok(texto.includes('Não recuperou'), 'e quem não alcançou');
