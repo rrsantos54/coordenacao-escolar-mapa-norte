@@ -790,6 +790,12 @@ function montarApp(opcoes = {}) {
   ok(impresso.includes('.aluno{white-space:nowrap;overflow:visible;display:flex;align-items:center}'), 'e o nome fica no meio do bloco mesclado');
   ok(impresso.includes('grid-template-columns:minmax(max-content,2.6fr)'), 'a grade da impressão é a mesma da tela');
 
+  // Sem margem em @page o navegador não tem onde desenhar data, título e
+  // about:blank. A margem de verdade vira padding do corpo, senão a ATA
+  // encosta na borda do papel.
+  ok(impresso.includes('@page{size:A4;margin:0}'), 'a página não deixa margem para o cabeçalho do navegador');
+  ok(/body\{[^}]*padding:15mm 12mm/.test(impresso), 'e a margem do documento volta como padding do corpo');
+
   // A tela lê o styles.css e a impressão lê o <style> que printAta monta. São
   // duas cópias das mesmas regras, e é fácil corrigir uma e esquecer a outra.
   const css = readFileSync(new URL('styles.css', raiz), 'utf8');

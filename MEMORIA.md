@@ -371,6 +371,21 @@ Como as quatro saídas alinham de formas diferentes, a regra é uma função só
 
 O cabeçalho das colunas de nota acompanha a centralização, nas quatro saídas.
 
+## Cabeçalho e rodapé do navegador na ATA impressa — 21/08/2026
+
+A ATA saía do papel com data e título no alto e `about:blank` embaixo. Não era
+conteúdo da página: é o cabeçalho e o rodapé que o navegador desenha na margem
+da folha, e o `about:blank` aparecia porque `printAta` abre a janela de
+impressão sem endereço (`window.open('','_blank')`).
+
+Correção: `@page{size:A4;margin:0}` no `<style>` que `printAta` monta. Sem
+margem, o navegador não tem onde desenhar os dois, e a margem de verdade volta
+como `padding:15mm 12mm` no corpo — sem isso a ATA encostaria na borda do
+papel, e parte dela cairia na área que a impressora não alcança.
+
+Limite: quem marcar "Cabeçalhos e rodapés" na caixa de impressão vê tudo de
+novo. Isso é ajuste do navegador, e a página não manda nele.
+
 ## Abertura da ATA e assinatura dos professores — 21/08/2026
 
 A abertura dizia "realizou-se a Avaliação de Recuperação Semestral dos alunos
