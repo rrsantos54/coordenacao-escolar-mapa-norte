@@ -383,6 +383,8 @@ function montarApp(opcoes = {}) {
   // foram aplicadas. É texto de documento oficial, e o mesmo tem que sair no
   // Word — por isso ele mora numa constante só.
   const abertura = paper.querySelector('.paper-intro').textContent;
+  ok(/^(Aos \d{1,2} dias|Ao primeiro dia) do mês de \p{L}+ de dois mil/u.test(abertura), 'a abertura traz a data do dia, sem lacuna para preencher');
+  ok(!abertura.includes('____'), 'e nenhuma lacuna sobrou na frase');
   ok(abertura.includes('procedeu-se ao registro dos resultados da Recuperação Semestral'), 'a abertura diz o que a ATA registra');
   ok(abertura.includes('período de 03 a 07 de agosto de 2026'), 'e em que período as avaliações foram aplicadas');
   ok(abertura.includes(TURMA_A_NOME), 'com a turma no meio da frase');
@@ -1037,6 +1039,7 @@ function montarApp(opcoes = {}) {
   await esperar();
 
   const texto = textoDoDocumento(baixados[baixados.length - 1].doc);
+  ok(/(Aos \d{1,2} dias|Ao primeiro dia) do mês de \p{L}+ de dois mil/u.test(texto), 'o Word também traz a data do dia');
   ok(texto.includes('procedeu-se ao registro dos resultados da Recuperação Semestral'), 'a abertura do Word é a mesma da tela');
   ok(texto.includes('período de 03 a 07 de agosto de 2026'), 'com o período das avaliações');
   ok(texto.includes('Professores:'), 'e o bloco de assinatura dos professores');
