@@ -371,6 +371,40 @@ Como as quatro saídas alinham de formas diferentes, a regra é uma função só
 
 O cabeçalho das colunas de nota acompanha a centralização, nas quatro saídas.
 
+## Abertura da ATA e assinatura dos professores — 21/08/2026
+
+A abertura dizia "realizou-se a Avaliação de Recuperação Semestral dos alunos
+da turma X" e parava aí. Faltavam duas coisas que a coordenação precisa ter
+escrito: que a ATA registra **resultados**, não a aplicação da prova, e quando
+as avaliações foram aplicadas. Ficou:
+
+> Aos ____ dias do mês de agosto de dois mil e vinte e seis, nesta unidade
+> escolar, procedeu-se ao registro dos resultados da Recuperação Semestral da
+> turma **X**, cujas avaliações foram aplicadas no período de 03 a 07 de agosto
+> de 2026, apurando-se os resultados discriminados a seguir:
+
+O texto vive em `ATA_ABERTURA` e `ATA_FECHO`, partido em dois porque o nome da
+turma vai em negrito no meio. Antes ele estava escrito por extenso em três
+lugares — o template do `index.html`, o `renderAta` e o `montarAtaWord` —, e
+duas cópias podiam divergir sem ninguém ver. O período fica em
+`PERIODO_DA_AVALIACAO`: é o campo que muda a cada semestre.
+
+**Assinaturas.** A ATA tinha só Coordenação e Direção. A coordenação escolheu
+acrescentar uma faixa `Professores:` com quatro linhas em branco, sem rótulo de
+componente. O Mapão não traz nome de professor em coluna nenhuma — conferido —,
+então a alternativa de uma linha por componente exigiria digitação à mão de
+qualquer jeito, e a faixa livre resolve com menos papel. No Word o bloco é uma
+tabela sem borda de quatro células, o mesmo recurso que o cabeçalho com brasão
+já usava.
+
+A linha de professor tem 18 traços e a de Coordenação tem 20. Parece detalhe,
+mas o teste que conta as linhas em branco precisa distinguir as duas: um
+`split` ingênuo pelo traço de 18 casa dentro do de 20 e conta seis onde há
+quatro. O teste usa `/(?<!_)_{18}(?!_)/`.
+
+O Excel não leva assinatura: ele é a tabela para conferência, e quem imprime
+para assinar usa o PDF ou o Word.
+
 ### Nome do aluno mesclado, e a ATA arrumada para imprimir — 20/08/2026
 
 Quatro pedidos juntos, todos de acabamento da ATA impressa: centralizar o
