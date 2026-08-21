@@ -56,6 +56,9 @@ const PUROS = [
   /^function salaDaUrl\(hash\).*$/m,
   /^const SALA_ALFABETO=.*$/m,
   /^function novaSala\(sorteio=.*$/m,
+  /^const MESES_POR_EXTENSO=.*$/m,
+  /^const ANO_POR_EXTENSO=.*$/m,
+  /^function aberturaDaAta\(hoje=new Date\(\)\).*$/m,
   /^const ATA_COLUNAS=.*$/m,
   /^const COLUNAS_DE_NOTA=.*$/m,
   /^const COLUNAS_CENTRALIZADAS=.*$/m,
@@ -77,7 +80,7 @@ const EXPORTA = [
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
-  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno', 'aberturaDaAta',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -89,7 +92,7 @@ const {
   parseExport, notaRecuperacao, bimestreSubstituido,
   NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
-  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno, aberturaDaAta,
 } = api;
 
 let checks = 0;
@@ -523,6 +526,19 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   const [linhaA] = combineRecords(semSufixo.records);
   const [linhaB] = combineRecords(comSufixo.records);
   eq(chaveDaLinha(linhaA), chaveDaLinha(linhaB), 'e as duas linhas casam na chave');
+}
+
+// ------------------------------------------------- data de abertura da ATA
+// A ATA é assinada no dia em que é gerada. A data vem do relógio, e o dia 1º
+// muda a concordância da frase inteira.
+{
+  eq(aberturaDaAta(new Date(2026, 7, 21)).startsWith('Aos 21 dias do mês de agosto de dois mil e vinte e seis'), true, 'dia, mês e ano na abertura');
+  eq(aberturaDaAta(new Date(2026, 7, 1)).startsWith('Ao primeiro dia do mês de agosto'), true, 'dia 1º sai como "Ao primeiro dia", não "Aos 1 dias"');
+  eq(aberturaDaAta(new Date(2026, 7, 2)).startsWith('Aos 2 dias'), true, 'e o dia 2 volta ao plural');
+  eq(aberturaDaAta(new Date(2026, 11, 15)).startsWith('Aos 15 dias do mês de dezembro'), true, 'dezembro é o último mês da lista, e não estoura');
+  eq(aberturaDaAta(new Date(2026, 0, 31)).startsWith('Aos 31 dias do mês de janeiro'), true, 'janeiro é o primeiro');
+  ok(aberturaDaAta(new Date(2026, 7, 21)).endsWith('da turma '), 'a frase termina aberta: o nome da turma entra em negrito depois dela');
+  ok(!aberturaDaAta().includes('____'), 'não sobra lacuna de data para preencher à mão');
 }
 
 // ----------------------------------------------- células da ATA em Word

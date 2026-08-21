@@ -383,7 +383,13 @@ as avaliações foram aplicadas. Ficou:
 > turma **X**, cujas avaliações foram aplicadas no período de 03 a 07 de agosto
 > de 2026, apurando-se os resultados discriminados a seguir:
 
-O texto vive em `ATA_ABERTURA` e `ATA_FECHO`, partido em dois porque o nome da
+A lacuna do dia saiu junto: a ATA é assinada no dia em que é gerada, então
+`aberturaDaAta` lê o relógio. Dia 1º muda a concordância da frase inteira e sai
+como "Ao primeiro dia", não "Aos 1 dias" — é a forma corrente em documento
+oficial, e tem teste. A função aceita a data por parâmetro justamente para o
+teste poder fixar o dia.
+
+O texto vive em `aberturaDaAta` e `ATA_FECHO`, partido em dois porque o nome da
 turma vai em negrito no meio. Antes ele estava escrito por extenso em três
 lugares — o template do `index.html`, o `renderAta` e o `montarAtaWord` —, e
 duas cópias podiam divergir sem ninguém ver. O período fica em
