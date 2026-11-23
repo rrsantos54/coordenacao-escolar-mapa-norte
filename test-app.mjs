@@ -1166,6 +1166,14 @@ function montarApp(opcoes = {}) {
   await esperar();
   eq(escritos[escritos.length - 1].linhas[0].length, 5, 'Excel da ATA com cinco colunas');
 
+  // A lista exportada do 3º não tem coluna de 2º bimestre.
+  doc.querySelector('#export-recovery').click();
+  await esperar();
+  const lista = escritos[escritos.length - 1].linhas;
+  ok(!lista[0].includes('Nota do segundo bimestre'), 'lista do 3º sem a coluna do 2º bimestre');
+  eq(lista[0][3], 'Nota do terceiro bimestre', 'a nota do 3º logo depois da disciplina');
+  eq(lista.find(l => l[2] === 'MATEMÁTICA')[4], '6', 'e a nota da recuperação na coluna seguinte');
+
   // Misturar com a semestral não tem ATA certa: o lote novo é recusado inteiro.
   await subirLote([[ARQUIVO_A, TURMA_A]]);
   eq(app.recoveryData.length, 2, 'o lote do 1º/2º não entra por cima do 3º');
