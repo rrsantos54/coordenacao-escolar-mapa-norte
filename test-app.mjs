@@ -1171,6 +1171,8 @@ function montarApp(opcoes = {}) {
   await esperar();
   const lista = escritos[escritos.length - 1].linhas;
   ok(!lista[0].includes('Nota do segundo bimestre'), 'lista do 3º sem a coluna do 2º bimestre');
+  ok(!lista[0].includes('Bimestre substituído'), 'e sem a coluna de bimestre substituído');
+  eq(lista[0].length, 7, 'sete colunas');
   eq(lista[0][3], 'Nota do terceiro bimestre', 'a nota do 3º logo depois da disciplina');
   eq(lista.find(l => l[2] === 'MATEMÁTICA')[4], '6', 'e a nota da recuperação na coluna seguinte');
 

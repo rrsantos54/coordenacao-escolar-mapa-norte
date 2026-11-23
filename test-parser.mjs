@@ -946,14 +946,16 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   ], nome);
   eq(comNumero.records.map(r => [r.aluno, r.disciplina, r.nota]), [['BETO NUMERO DOIS', 'ARTE', 3]], 'só a nota do M entra, e o Nº de chamada não vira nota');
 
-  // Lista exportada do 3º, sem a coluna do 2º bimestre, volta com tudo no lugar.
+  // Lista exportada do 3º, sem 2º bimestre e sem bimestre substituído, volta
+  // com tudo no lugar.
   const devolvida = parseExport([
-    ['Aluno', 'Turma', 'Disciplina', 'Nota do terceiro bimestre', 'Nota da recuperação semestral', 'Bimestre substituído', 'Desfecho', 'Status'],
-    ['ANA', '6° ANO A', 'MATEMATICA', '3', '7', '3º bimestre', 'Recuperou', 'Concluído'],
-    ['BIA', '6° ANO A', 'ARTE', '2', 'Não realizou', '', 'Não realizou', 'Concluído'],
+    ['Aluno', 'Turma', 'Disciplina', 'Nota do terceiro bimestre', 'Nota da recuperação semestral', 'Desfecho', 'Status'],
+    ['ANA', '6° ANO A', 'MATEMATICA', '3', '7', 'Recuperou', 'Concluído'],
+    ['BIA', '6° ANO A', 'ARTE', '2', 'Não realizou', 'Não realizou', 'Concluído'],
   ]);
   eq(devolvida[0], ['ANA', '6° ANO A', 'MATEMÁTICA', '3', '—', '7', TERCEIRO, 'Concluído'], 'a nota da recuperação não escorrega para a coluna do 2º');
-  eq(devolvida[1][6], TERCEIRO, 'a marca do 3º vem do cabeçalho, mesmo com a célula vazia');
+  eq(devolvida[1][6], TERCEIRO, 'a marca do 3º vem do cabeçalho, sem coluna de bimestre');
+  eq(devolvida[1][5], NO_EXAM, 'Não realizou volta como Não realizou');
 
   // Consolidado com coluna (3B): o sufixo sai do nome e marca o bimestre.
   eq(cleanSubject('MATEMATICA (3B)'), 'MATEMÁTICA', '(3B) sai do nome do componente');
