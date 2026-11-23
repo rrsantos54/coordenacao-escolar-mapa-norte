@@ -1127,4 +1127,50 @@ function montarApp(opcoes = {}) {
   ok(tabelaDoWord.opcoes.columnWidths[0] > tabelaDoWord.opcoes.columnWidths[2], 'a coluna do aluno é mais larga que a de nota');
 }
 
+// ================================================== ATA do 3º bimestre na tela
+// Mapão por bimestre do 3º, com metadado como o real de outubro de 2026.
+{
+  const ARQUIVO_3 = 'MAPAO_ESCOLA_6°_ANO_A_INTEGRAL_9H_ANUAL_CONSELHO_TERCEIRO_BIMESTRE_22102026_1121.xlsx';
+  const TURMA_3 = [
+    ['Turma:', TURMA_A_NOME],
+    ['Tipo Fechamento:', 'Conselho Terceiro Bimestre'],
+    ['ALUNO', 'RA', 'MATEMATICA', 'ARTE', 'TOTAL'],
+    ['ANA DO TERCEIRO', '1', '3', '2', '5'],
+    ['BRUNO SEM PENDENCIA', '2', '8', '9', '17'],
+  ];
+  const { window, doc, app, subirLote, escritos, esperar } = montarApp();
+  await subirLote([[ARQUIVO_3, TURMA_3]]);
+  eq(app.recoveryData.length, 2, 'duas pendências, Arte incluída');
+  ok(app.recoveryData.every(r => r[6] === '3º bimestre'), 'as duas marcadas como 3º bimestre');
+
+  app.switchView('recovery');
+  ok(doc.querySelector('.recovery-table').classList.contains('so-terceiro'), 'a lista esconde 2º bimestre e bimestre substituído');
+  eq(doc.querySelectorAll('.recovery-table th')[3].textContent, '3º bim.', 'e a coluna da nota diz 3º bim.');
+
+  const alvo = app.recoveryData.findIndex(r => r[2] === 'MATEMÁTICA');
+  const sel = doc.querySelector(`select.score-input[data-index="${alvo}"]`);
+  sel.value = '6';
+  sel.dispatchEvent(new window.Event('change', { bubbles: true }));
+  await esperar();
+  eq(app.recoveryData[alvo][7], 'Concluído', 'nota lançada conclui, sem escolher bimestre');
+
+  app.switchView('minutes');
+  app.renderAta(TURMA_A_NOME);
+  const cabecalho = [...doc.querySelectorAll('.paper-table span')].slice(0, 5).map(s => s.textContent);
+  eq(cabecalho, ['Aluno', 'Disciplina', 'Nota do terceiro bimestre', 'Nota da recuperação semestral', 'Desfecho'], 'ATA do 3º com cinco colunas');
+  eq(doc.querySelector('.paper-table').style.gridTemplateColumns.split(' ').length, 5, 'e a grade da tela com cinco trilhas');
+  ok(doc.querySelector('.paper-intro').textContent.includes('Recuperação Semestral da turma'), 'abertura igual à da ATA de hoje');
+  ok(!doc.querySelector('.paper-intro').textContent.includes('agosto de 2026'), 'sem o período de agosto');
+
+  doc.querySelector('#download-ata-excel').click();
+  await esperar();
+  eq(escritos[escritos.length - 1].linhas[0].length, 5, 'Excel da ATA com cinco colunas');
+
+  // Misturar com a semestral não tem ATA certa: o lote novo é recusado inteiro.
+  await subirLote([[ARQUIVO_A, TURMA_A]]);
+  eq(app.recoveryData.length, 2, 'o lote do 1º/2º não entra por cima do 3º');
+  ok(doc.querySelector('#toast').textContent.includes('Apagar dados'), 'e o aviso diz o que fazer');
+  window.close();
+}
+
 console.log(`ok — ${checks} verificações de comportamento`);

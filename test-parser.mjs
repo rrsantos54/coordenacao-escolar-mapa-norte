@@ -17,6 +17,9 @@ const PUROS = [
   /const NO_EXAM='[^']*';/,
   /^const NO_RECOVERY=.*$/m,
   /^function semNota\(valor\).*$/m,
+  /^const TERCEIRO=.*$/m,
+  /^function ehTerceiro\(row\).*$/m,
+  /^function semBimestre\(row\).*$/m,
   /^function normal\(v\).*$/m,
   /^const SCHOOL_TITLES=.*$/m,
   /^function normalizeSchoolName\(name\).*$/m,
@@ -37,7 +40,7 @@ const PUROS = [
   /^function parseSheet\(rows,fileName,todasAsNotas=false\).*$/m,
   /^const SCHOOL_LABELS=.*$/m,
   /^function detectSchool\(rows\).*$/m,
-  /^function keepRecords\(records,rows\).*$/m,
+  /^function keepRecords\(records,rows,todosOsComponentes=false\).*$/m,
   /^function combineRecords\(records\).*$/m,
   /^function rowStatus\(row\).*$/m,
   /^function desfecho\(row\).*$/m,
@@ -62,16 +65,24 @@ const PUROS = [
   /^const MESES_POR_EXTENSO=.*$/m,
   /^const ANO_POR_EXTENSO=.*$/m,
   /^function aberturaDaAta\(hoje=new Date\(\)\).*$/m,
+  /^const LARGURAS_DA_ATA=.*$/m,
+  /^const LARGURAS_DA_ATA_EXCEL=.*$/m,
+  /^const PERIODO_DA_AVALIACAO=.*$/m,
+  /^const ATA_FECHO=.*$/m,
   /^const ATA_COLUNAS=.*$/m,
   /^const COLUNAS_DE_NOTA=.*$/m,
   /^const COLUNAS_CENTRALIZADAS=.*$/m,
-  /^function celulaCentralizada\(coluna\).*$/m,
+  /^function celulaCentralizada\(coluna,layout=ATA_SEMESTRAL\).*$/m,
   /^function notaBaixa\(v\).*$/m,
   /^function notaAlta\(v\).*$/m,
-  /^function classeDaCelula\(coluna,valor\).*$/m,
-  /^function classesDaCelula\(coluna,valor\).*$/m,
+  /^function classeDaCelula\(coluna,valor,layout=ATA_SEMESTRAL\).*$/m,
+  /^function classesDaCelula\(coluna,valor,layout=ATA_SEMESTRAL\).*$/m,
   /^function blocosDoAluno\(linhas\).*$/m,
   /^function bimestreDaAta\(row\).*$/m,
+  /^const ATA_SEMESTRAL=.*$/m,
+  /^const PERIODO_DO_TERCEIRO=.*$/m,
+  /^const ATA_TERCEIRO=.*$/m,
+  /^function layoutDaAta\(rows\).*$/m,
   /^function celulasDaAta\(rows\).*$/m,
   /^function nomeDoArquivoAta\(className,ext='docx'\).*$/m,
 ];
@@ -83,7 +94,7 @@ const EXPORTA = [
   'parseExport', 'notaRecuperacao', 'bimestreSubstituido',
   'NO_EXAM', 'NO_RECOVERY', 'semNota', 'desfecho', 'aplicarPosRecuperacao', 'notasPosRecuperacao',
   'chaveDaLinha', 'linhasParaSala', 'linhasDaSala', 'salaDaUrl', 'novaSala', 'SALA_ALFABETO',
-  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno', 'aberturaDaAta', 'PROFESSORES', 'fileirasDeProfessor',
+  'celulasDaAta', 'nomeDoArquivoAta', 'ATA_COLUNAS', 'classeDaCelula', 'classesDaCelula', 'blocosDoAluno', 'TERCEIRO', 'ehTerceiro', 'linhaValidada', 'ATA_TERCEIRO', 'layoutDaAta', 'aberturaDaAta', 'PROFESSORES', 'fileirasDeProfessor',
 ];
 
 const modulo = PUROS.map(grab).join('\n') + `\nexport { ${EXPORTA.join(', ')} };`;
@@ -95,7 +106,7 @@ const {
   parseExport, notaRecuperacao, bimestreSubstituido,
   NO_EXAM, NO_RECOVERY, semNota, desfecho, aplicarPosRecuperacao, notasPosRecuperacao,
   chaveDaLinha, linhasParaSala, linhasDaSala, salaDaUrl, novaSala, SALA_ALFABETO,
-  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno, aberturaDaAta, PROFESSORES, fileirasDeProfessor,
+  celulasDaAta, nomeDoArquivoAta, ATA_COLUNAS, classeDaCelula, classesDaCelula, blocosDoAluno, TERCEIRO, ehTerceiro, linhaValidada, ATA_TERCEIRO, layoutDaAta, aberturaDaAta, PROFESSORES, fileirasDeProfessor,
 } = api;
 
 let checks = 0;
@@ -455,7 +466,7 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
   for (const [entrada, esperado] of [['7', '7'], [7, '7'], ['Não realizou', 'Não realizou'], ['NAO REALIZOU', 'Não realizou'], ['0', '—'], ['', '—'], [null, '—'], ['7,5', '—']]) {
     eq(notaRecuperacao(entrada), esperado, `nota de recuperação: ${entrada}`);
   }
-  for (const [entrada, esperado] of [['1º bimestre', '1º bimestre'], ['2º bimestre', '2º bimestre'], ['1', '1º bimestre'], ['', ''], ['3º bimestre', '']]) {
+  for (const [entrada, esperado] of [['1º bimestre', '1º bimestre'], ['2º bimestre', '2º bimestre'], ['1', '1º bimestre'], ['', ''], ['3º bimestre', '3º bimestre'], ['4º bimestre', '']]) {
     eq(bimestreSubstituido(entrada), esperado, `bimestre substituído: ${entrada}`);
   }
 
@@ -899,5 +910,84 @@ const ok = (cond, msg) => { checks++; assert.ok(cond, msg); };
     'os blocos cobrem todas as linhas, sem sobra nem falta');
 }
 
+// ------------------------------------------------------------- ATA do 3º bimestre
+// Pedido da coordenação em 23/11/2026: ATA só do 3º bimestre, com o mesmo
+// fluxo da semestral, e com todos os componentes — sem a exclusão da Prova
+// Paulista. O nome do arquivo e o metadado copiam o Mapão real de outubro.
+{
+  const nome = 'MAPAO_WALDOMIRO_SAMPAIO_DE_SOUZA_PREFEITO_6°_ANO_A_INTEGRAL_9H_ANUAL_CONSELHO_TERCEIRO_BIMESTRE_22102026_1121.xlsx';
+  eq(bimester(nome), '3º', 'o 3º bimestre vem do nome do arquivo');
+  eq(bimester('mapao.xlsx', [['Tipo Fechamento:', 'Conselho Terceiro Bimestre']]), '3º', 'ou do metadado Tipo Fechamento');
+  eq(bimester('MAPAO_3ª_SERIE_A_CONSELHO_PRIMEIRO_BIMESTRE.xlsx'), '1º', '3ª SÉRIE no nome não é 3º bimestre');
+  eq(bimester('MAPAO_6°_ANO_CONSELHO_SEGUNDO_BIMESTRE.xlsx'), '2º', 'o 2º continua sendo o 2º');
+
+  const rows = [
+    ['Turma:', '6° ANO A INTEGRAL 9H ANUAL'],
+    ['Tipo Fechamento:', 'Conselho Terceiro Bimestre'],
+    ['ALUNO', 'RA', 'MATEMATICA', 'REDACAO E LEITURA', 'ARTE', 'TOTAL'],
+    ['ANA TERCEIRO', '1', '3', '4', '2', '9'],
+    ['BRUNO TRANSFERIDO', 'Transferido', '1', '1', '1', '3'],
+  ];
+  const parsed = parseSheet(rows, nome);
+  ok(parsed.records.every(r => r.bimestre === '3º'), 'toda nota do arquivo é do 3º');
+  const todos = keepRecords(parsed.records, rows, true);
+  eq(todos.map(r => r.disciplina).sort(), ['ARTE', 'MATEMÁTICA', 'REDAÇÃO E LEITURA'], 'no 3º entram todos os componentes');
+  ok(!todos.some(r => r.aluno === 'BRUNO TRANSFERIDO'), 'mas transferido continua fora');
+  eq(keepRecords(parsed.records, rows).map(r => r.disciplina), ['MATEMÁTICA'], 'sem o parâmetro, a regra da semestral fica igual');
+
+  // Exportação de 19/10/2026: Nº de chamada antes do M em cada componente. A
+  // nota é a do M; o Nº — 1, 2, 3… — já pôs aluno em recuperação em tudo.
+  const comNumero = parseSheet([
+    ['Turma:', '7º ANO A INTEGRAL 9H ANUAL'],
+    ['ALUNO', 'SITUAÇÃO', 'ARTE\r\n1813', '', '', '', 'CIENCIAS\r\n8468', '', '', '', 'TOTAL', '', ''],
+    ['', '', 'Nº', 'M', 'F', 'AC', 'Nº', 'M', 'F', 'AC', 'TF', 'Fre(%)', 'FT An'],
+    ['ALICE NUMERO UM', 'Ativo', 1, '-', '-', '-', 1, '6', '0', '0', '2', '93%', 27],
+    ['BETO NUMERO DOIS', 'Ativo', 2, '3', '0', '0', 2, '8', '2', '0', '6', '92%', 33],
+  ], nome);
+  eq(comNumero.records.map(r => [r.aluno, r.disciplina, r.nota]), [['BETO NUMERO DOIS', 'ARTE', 3]], 'só a nota do M entra, e o Nº de chamada não vira nota');
+
+  // Consolidado com coluna (3B): o sufixo sai do nome e marca o bimestre.
+  eq(cleanSubject('MATEMATICA (3B)'), 'MATEMÁTICA', '(3B) sai do nome do componente');
+
+  const [linha] = combineRecords(todos.filter(r => r.disciplina === 'MATEMÁTICA'));
+  eq(linha, ['ANA TERCEIRO', '6° ANO A INTEGRAL 9H ANUAL', 'MATEMÁTICA', '3', '—', '—', TERCEIRO, 'Pendente'], 'a nota do 3º vai na primeira posição, com a marca no bimestre');
+  ok(ehTerceiro(linha), 'e a linha se reconhece como do 3º');
+  eq(rowStatus([...linha.slice(0, 5), '6', TERCEIRO, '']), 'Concluído', 'nota lançada conclui a linha, sem escolher bimestre');
+
+  // A marca sobrevive a Não realizou, que apaga o bimestre das linhas da semestral.
+  const naoRealizou = mergeRows([linha], [[...linha.slice(0, 5), NO_EXAM, '', '']]);
+  eq(naoRealizou[0][6], TERCEIRO, 'mesclar com Não realizou mantém a marca do 3º');
+  eq(linhaValidada('ANA', 'T', 'MATEMATICA', '3', '', NO_EXAM, TERCEIRO)[6], TERCEIRO, 'planilha devolvida e sala também mantêm');
+  eq(linhaValidada('ANA', 'T', 'MATEMATICA', '3', '', NO_EXAM, '1º bimestre')[6], '', 'e a semestral continua limpando');
+
+  // Mapão pós-recuperação do 3º: só a nota do 3º é comparada.
+  const pos = aplicarPosRecuperacao([linha], [{ aluno: 'ANA TERCEIRO', turma: '6° ANO A INTEGRAL 9H ANUAL', disciplina: 'MATEMATICA', bimestre: '3º', nota: 6 }]);
+  eq([pos.linhas[0][5], pos.linhas[0][6], pos.preenchidas], ['6', TERCEIRO, 1], 'a nota que subiu vira a da recuperação');
+  const igual = aplicarPosRecuperacao([linha], [{ aluno: 'ANA TERCEIRO', turma: '6° ANO A INTEGRAL 9H ANUAL', disciplina: 'MATEMATICA', bimestre: '3º', nota: 3 }]);
+  eq([igual.linhas[0][5], igual.linhas[0][6]], [NO_RECOVERY, TERCEIRO], 'nota igual é Não recuperou, e a marca fica');
+
+  // A ATA do 3º: cinco colunas, sem 2º bimestre nem bimestre substituído.
+  const celulas = celulasDaAta([
+    [...linha.slice(0, 5), '7', TERCEIRO, 'Concluído'],
+    ['CARLA', '6° ANO A INTEGRAL 9H ANUAL', 'ARTE', '2', '—', NO_RECOVERY, TERCEIRO, 'Concluído'],
+    ['DIEGO', '6° ANO A INTEGRAL 9H ANUAL', 'ARTE', '4', '—', '—', TERCEIRO, 'Pendente'],
+  ]);
+  eq(celulas[0], ['Aluno', 'Disciplina', 'Nota do terceiro bimestre', 'Nota da recuperação semestral', 'Desfecho'], 'cabeçalho do 3º');
+  eq(celulas[1], ['ANA TERCEIRO', 'MATEMÁTICA', '3', '7', 'Recuperou'], 'quem recuperou');
+  eq(celulas[2], ['CARLA', 'ARTE', '2', NO_RECOVERY, NO_RECOVERY], 'quem não recuperou');
+  eq(celulas[3], ['DIEGO', 'ARTE', '4', '____', '____'], 'sem nota lançada, lacuna');
+  ok(celulas.every(l => l.length === 5), 'todas as linhas com cinco células');
+  eq(layoutDaAta([linha, ['X', 'T', 'D', '3', '4', '—', '1º bimestre', '']]), layoutDaAta([['X', 'T', 'D', '3', '4', '—', '', '']]), 'turma misturada não vira ATA do 3º');
+  ok(!ATA_TERCEIRO.fecho.includes('agosto'), 'o período de agosto da semestral não vai para a ATA do 3º');
+  eq(ATA_TERCEIRO.larguras.length, 5, 'uma largura por coluna no Word');
+  eq(ATA_TERCEIRO.largurasExcel.length, 5, 'e no Excel');
+
+  // Cores pelas colunas do 3º: a nota da recuperação está na 3, o desfecho na 4.
+  eq(classeDaCelula(2, '3', ATA_TERCEIRO), 'nota-baixa', 'nota do 3º abaixo de 5 em vermelho');
+  eq(classeDaCelula(3, '7', ATA_TERCEIRO), 'nota-recuperou', 'recuperação a partir de 5 em verde');
+  eq(classeDaCelula(4, 'Recuperou', ATA_TERCEIRO), 'nota-recuperou', 'desfecho na quinta coluna');
+  eq(classeDaCelula(6, 'Recuperou', ATA_TERCEIRO), '', 'a coluna 6 não existe no 3º');
+  eq(classesDaCelula(4, NO_RECOVERY, ATA_TERCEIRO), 'nota-baixa', 'desfecho tem cor e fica à esquerda');
+}
 
 console.log(`ok — ${checks} verificações`);
