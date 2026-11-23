@@ -58,6 +58,12 @@ planilha de aluno não pode ser versionada neste repositório.
 - Aluno com vários componentes aparece uma vez só, com a célula do nome mesclada
   para baixo e o nome centralizado no bloco, sem quebrar linha.
 - A planilha exportada volta a ser importada, para o lançamento em dupla.
+- ATA do 3º bimestre: lote só com Mapões do 3º gera a ATA com Aluno, Disciplina,
+  Nota do terceiro bimestre, Nota da recuperação semestral e Desfecho. Entram
+  todos os componentes, sem a exclusão da Prova Paulista. O lote do 3º não se
+  mistura com o do 1º e 2º bimestre.
+- Mapão com coluna `Nº` de chamada antes do `M` em cada componente: a nota é
+  lida do `M`.
 - Sala compartilhada por link, quando ligada: duas pessoas lançam nota juntas.
 - Mantém arquivos originais intactos.
 
